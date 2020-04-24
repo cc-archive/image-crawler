@@ -214,8 +214,9 @@ class FakeRedis:
 class AioNetworkSimulatingSession:
     """
     It's a FakeAIOSession, but it can simulate network latency, errors,
-    and congestion. At 80% of its max load, it will start to slow down and occasionally
-    throw an error. At 100%, error rates become very high and response times slow.
+    and congestion. At 80% of its max load, it will start to slow down and
+    occasionally throw an error. At 100%, error rates become very high and
+    response times slow.
     """
 
     class Load(Enum):

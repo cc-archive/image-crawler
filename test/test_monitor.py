@@ -101,7 +101,8 @@ async def test_temporary_halts(source_fixture):
     redis.store[error_key] = []
     redis.store[no_error_key] = []
     error_response = (one_second_ago, bytes(f'500:{one_second_ago}', 'utf-8'))
-    successful_response = (one_second_ago, bytes(f'200:{one_second_ago}', 'utf-8'))
+    successful_response = \
+        (one_second_ago, bytes(f'200:{one_second_ago}', 'utf-8'))
     for _ in range(3):
         redis.store[error_key].append(error_response)
     for _ in range(8):

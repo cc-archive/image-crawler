@@ -49,7 +49,7 @@ class CrawlScheduler:
         return msgs
 
     @staticmethod
-    def _get_num_unfinished_tasks(task_schedule, source):
+    def _get_unfinished_tasks(task_schedule, source):
         try:
             tasks = task_schedule[source]
             return sum([not t.done() for t in tasks])
@@ -99,7 +99,7 @@ class CrawlScheduler:
         share = min(math.floor(settings.MAX_TASKS / num_sources), max_share)
         to_schedule = {}
         for source in sources:
-            num_unfinished = self._get_num_unfinished_tasks(task_schedule, source)
+            num_unfinished = self._get_unfinished_tasks(task_schedule, source)
             num_to_schedule = share - num_unfinished
             consumer = self._get_consumer(source)
             source_msgs = self._consume_n(consumer, num_to_schedule)

@@ -1,0 +1,12 @@
+language: python
+addons:
+python:
+- '3.7'
+install:
+  - pip3 install pipenv
+  - pipenv install --system --deploy && cd ../../
+before_install:
+  - "export PYTHONPATH=$PYTHONPATH:$(pwd)"
+script:
+  - pycodestyle . --max-line-length=80 --ignore=E402,W503
+  - PYTHONPATH=. pipenv run pytest -s

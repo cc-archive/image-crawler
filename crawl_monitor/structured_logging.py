@@ -90,5 +90,3 @@ async def log_state(redis, info):
                 state['specific'][source] = source_specifics
         json_log(state)
         await asyncio.sleep(settings.LOG_FREQUENCY_SECONDS)
-
-
