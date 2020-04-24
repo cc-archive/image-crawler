@@ -14,7 +14,7 @@ processes on any number of machines.
 `docker-compose up --build`
 
 ## How do I run the tests?
-```
+```shell
 pipenv install
 pipenv shell
 PYTHONPATH=. pytest
@@ -29,7 +29,7 @@ the docker-compose network. Enter the worker container and run it from
 there.
 
 
-```
+```shell
 docker exec -it image_get_worker_1 /bin/bash
 pipenv run python dummy_producer.py
 ```
