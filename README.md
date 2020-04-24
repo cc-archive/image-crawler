@@ -4,7 +4,7 @@
 A distributed solution for retrieving images from a list of URLs fed to a 
 message queue. Async workers consume messages from this queue and 
 store the images at the configured resolution in S3. The workers also scrape
-metadata, including image resolution and EXIF tags, and publishes the 
+metadata, including image resolution and EXIF tags, and publish the 
 results back to Kafka.
 
 Performance is horizontally scalable; workers can be run in any number of 
