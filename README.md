@@ -180,7 +180,7 @@ The simplest way to achieve this is to set the Kafka-wide `num.partitions` equal
 
 Rate limits are set in proportion to the number of artifacts we are crawling from a given source. The logic behind this is that sites with more images have more infrastructure in place for serving high traffic. If the automatic crawl rate isn't satisfactory for whatever reason, it can be manually overridden.
 
-```
+```shell
 redis-cli
 > set override-rate:example 10
 # Sets rate limit for `example` to 10 requests per second
@@ -193,7 +193,7 @@ The crawler is designed to operate with minimal manual intervention; if everythi
 One exception where operators must intervene is if a source trips the error circuit breaker. If any source has 50 failed requests in a row, all crawling for that source will be stopped automatically. To resume crawling, the operator should inspect the `crawl_monitor` logs to find the nature of the error message, manually lower the rate limit for the source if necessary, and reset the circuit breaker using the Redis client.
 
 For instance, if the source "example" has tripped the circuit breaker, this is the procedure for resuming crawling:
-```
+```shell
 redis-cli
 # View which sources have tripped the circuit breaker
 > smembers halted
