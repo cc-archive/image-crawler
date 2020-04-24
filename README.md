@@ -46,9 +46,9 @@ Input and output into the cluster is controlled through message topics.
 The cluster expects a JSON message with the following structure:
 ```json
 {
-    'url': 'https://example.gov/example.jpg',
-    'uuid': '7563efd4-58d0-41eb-9a4f-3903d36a5225',
-    'source': 'example'
+    "url": "https://example.gov/example.jpg",
+    "uuid": "7563efd4-58d0-41eb-9a4f-3903d36a5225",
+    "source": "example"
 }
 ```
 
@@ -79,7 +79,7 @@ Example: discovering the EXIF metadata of an image. The below example contains a
 {
     "identifier": "7563efd4-58d0-41eb-9a4f-3903d36a5225",
     "exif": {
-        "0x13b": "Alden Page"
+        "0x13b": "Alden Page",
         "0x9209": 0
     }
 }
