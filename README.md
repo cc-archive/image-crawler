@@ -44,7 +44,7 @@ Input and output into the cluster is controlled through message topics.
 `inbound_images` is the point of entry for scheduling image downloads.
 
 The cluster expects a JSON message with the following structure:
-```
+```json
 {
     'url': 'https://example.gov/example.jpg',
     'uuid': '7563efd4-58d0-41eb-9a4f-3903d36a5225',
@@ -66,7 +66,7 @@ The `image_metadata_updates` topic contains resolution metadata discovered from 
 
 Example: discovering the resolution of an image
 
-```
+```json
 {
     "height": 1024,
     "width": 768,
@@ -75,7 +75,7 @@ Example: discovering the resolution of an image
 ```
 
 Example: discovering the EXIF metadata of an image. The below example contains an artist named Alden Page and a Flash of [value](https://exiftool.org/TagNames/EXIF.html#Flash) 0, indicating it was not used. For more details on decoding EXIF, see the [list of EXIF tags](https://exiftool.org/TagNames/EXIF.html) and [PIL's EXIF tag list](https://github.com/python-pillow/Pillow/blob/master/src/PIL/ExifTags.py).
-```
+```json
 {
     "identifier": "7563efd4-58d0-41eb-9a4f-3903d36a5225",
     "exif": {
@@ -91,7 +91,7 @@ The `crawl_monitor` logs useful information about the crawl in a machine-friendl
 
 ## `monitoring_update`
 `monitoring_update` is the most common event, and will appear every 5 seconds.
-```
+```json
 {
    "event" : "monitoring_update",
    "time" : "2020-04-17T20:22:56.837232",
@@ -157,7 +157,7 @@ The specific statistics are statistics that are specific to a given source; the 
 `crawl_halted` events indicate that crawling has stopped, temporarily or permanently, for a single source. Temporary halts are resolved automatically, while permanent halts require intervention from an operator. See "The error circuit breaker" section for details.
 
 An example `crawl_halted` message:
-```
+```json
 {
    "time" : "2020-04-17T16:57:52.135155",
    "type" : "temporary",
