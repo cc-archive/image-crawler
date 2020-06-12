@@ -121,12 +121,16 @@ async def producer_fixture():
     return kafka
 
 
-def test_resolution_messaging(producer_fixture):
+def test_quality_messaging(producer_fixture):
     resolution_msg = producer_fixture.messages[0]
     parsed = json.loads(str(resolution_msg, 'utf-8'))
-    expected_fields = ['height', 'width', 'identifier']
+    expected_fields = [
+        'height', 'width', 'identifier', 'compression_quality', 'filesize'
+    ]
     for field in expected_fields:
         assert field in parsed
+        assert parsed[field] is not None
+        assert parsed[field] != ''
 
 
 def test_exif_messaging(producer_fixture):
