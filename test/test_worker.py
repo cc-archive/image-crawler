@@ -48,6 +48,8 @@ async def test_pipeline():
 async def test_handles_corrupt_images_gracefully():
     redis = FakeRedis()
     stats = StatsManager(redis)
+    kafka = FakeProducer()
+    producer = MetadataProducer(kafka)
     await process_image(
         persister=validate_thumbnail,
         session=RateLimitedClientSession(FakeAioSession(corrupt=True), redis),
@@ -55,8 +57,14 @@ async def test_handles_corrupt_images_gracefully():
         identifier='4bbfe191-1cca-4b9e-aff0-1d3044ef3f2d',
         stats=stats,
         source='example',
-        semaphore=asyncio.BoundedSemaphore(1000)
+        semaphore=asyncio.BoundedSemaphore(1000),
+        metadata_producer=producer
     )
+    producer_task = asyncio.create_task(producer.listen())
+    try:
+        await asyncio.wait_for(producer_task, 0.01)
+    except concurrent.futures.TimeoutError:
+        pass
 
 
 @pytest.mark.asyncio
