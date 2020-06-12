@@ -1,11 +1,11 @@
 import asyncio
-import os
+import wand.image
 from functools import partial
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from worker import settings as settings
 from worker.stats_reporting import StatsManager
-import wand.image
+from wand.exceptions import CorruptImageError, MissingDelegateError
 
 
 async def process_image(
@@ -60,14 +60,17 @@ def thumbnail_image(img: Image):
     return output
 
 
-def notify_quality(img: Image, file, identifier, metadata_producer):
+def notify_quality(img: Image, buffer, identifier, metadata_producer):
     """ Collect quality metadata. """
     height, width = img.size
-    filesize = os.fstat(file.fileno()).st_size
-    file.seek(0)
-    jpeg_quality = wand.image.Image(file).compression_quality()
+    filesize = buffer.getbuffer().nbytes
+    buffer.seek(0)
+    try:
+        compression_quality = wand.image.Image(file=buffer).compression_quality
+    except (CorruptImageError, MissingDelegateError):
+        compression_quality = None
     metadata_producer.notify_image_quality_update(
-        height, width, identifier, filesize, jpeg_quality
+        height, width, identifier, filesize, compression_quality
     )
 
 

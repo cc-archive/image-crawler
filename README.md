@@ -21,6 +21,8 @@ PYTHONPATH=. pytest
 ```
 Use `pytest -s` to include debug logs.
 
+It is recommended that you run these tests within the container.
+
 ## How do I feed images to it?
 See `dummy_producer.py` for an example.
 

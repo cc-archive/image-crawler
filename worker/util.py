@@ -42,7 +42,7 @@ class MetadataProducer:
         self._metadata_messages = []
 
     def notify_image_quality_update(
-            self, height, width, identifier, filesize, jpeg_quality
+            self, height, width, identifier, filesize, compression_quality
     ):
         """ Enqueue an image size update. """
         msg = json.dumps(
@@ -51,7 +51,7 @@ class MetadataProducer:
                 'width': width,
                 'identifier': identifier,
                 'filesize': filesize,
-                'jpeg_quality': jpeg_quality
+                'compression_quality': compression_quality
             }
         )
         msg_bytes = bytes(msg, 'utf-8')

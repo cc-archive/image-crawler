@@ -4,13 +4,14 @@ import asyncio
 import logging as log
 import concurrent.futures
 from worker.util import MetadataProducer
-from test.mocks import FakeConsumer, FakeAioSession, FakeRedis,\
-    AioNetworkSimulatingSession, FakeProducer
+from test.mocks import (
+    FakeConsumer, FakeAioSession, FakeRedis, AioNetworkSimulatingSession,
+    FakeProducer
+)
 from worker.stats_reporting import StatsManager
 from worker.image import process_image
 from worker.rate_limit import RateLimitedClientSession
 from PIL import Image
-from functools import partial
 
 
 log.basicConfig(level=log.DEBUG)
