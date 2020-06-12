@@ -21,7 +21,7 @@ PYTHONPATH=. pytest
 ```
 Use `pytest -s` to include debug logs.
 
-It is recommended that you run these tests within the container.
+You may need to [install ImageMagick](http://docs.wand-py.org/en/0.6.1/guide/install.html) on your development machine; execute the tests inside of the container to avoid this requirement.
 
 ## How do I feed images to it?
 See `dummy_producer.py` for an example.
@@ -66,15 +66,19 @@ The cluster expects a JSON message with the following structure:
 
 The `image_metadata_updates` topic contains resolution metadata discovered from crawled images.
 
-Example: discovering the resolution of an image
+Example: discovering the quality of an image
 
 ```json
 {
     "height": 1024,
     "width": 768,
+    "compression_quality": 85,
+    "filesize": 15623
     "identifier": "7563efd4-58d0-41eb-9a4f-3903d36a5225"
 }
 ```
+
+The event contains the resolution of the image, the amount of compression (if applicable; otherwise `null`), and the size of the file in bytes.
 
 Example: discovering the EXIF metadata of an image. The below example contains an artist named Alden Page and a Flash of [value](https://exiftool.org/TagNames/EXIF.html#Flash) 0, indicating it was not used. For more details on decoding EXIF, see the [list of EXIF tags](https://exiftool.org/TagNames/EXIF.html) and [PIL's EXIF tag list](https://github.com/python-pillow/Pillow/blob/master/src/PIL/ExifTags.py).
 ```json
