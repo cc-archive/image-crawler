@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from worker import settings as settings
 from worker.stats_reporting import StatsManager
-from wand.exceptions import CorruptImageError, MissingDelegateError
+from wand.exceptions import WandException
 
 
 async def process_image(
@@ -67,7 +67,7 @@ def notify_quality(img: Image, buffer, identifier, metadata_producer):
     buffer.seek(0)
     try:
         compression_quality = wand.image.Image(file=buffer).compression_quality
-    except (CorruptImageError, MissingDelegateError):
+    except WandException:
         compression_quality = None
     metadata_producer.notify_image_quality_update(
         height, width, identifier, filesize, compression_quality
