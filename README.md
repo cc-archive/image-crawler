@@ -73,7 +73,7 @@ Example: discovering the quality of an image
     "height": 1024,
     "width": 768,
     "compression_quality": 85,
-    "filesize": 15623
+    "filesize": 15623,
     "identifier": "7563efd4-58d0-41eb-9a4f-3903d36a5225"
 }
 ```
