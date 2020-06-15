@@ -4,13 +4,14 @@ import asyncio
 import logging as log
 import concurrent.futures
 from worker.util import MetadataProducer
-from test.mocks import FakeConsumer, FakeAioSession, FakeRedis,\
-    AioNetworkSimulatingSession, FakeProducer
+from test.mocks import (
+    FakeConsumer, FakeAioSession, FakeRedis, AioNetworkSimulatingSession,
+    FakeProducer
+)
 from worker.stats_reporting import StatsManager
 from worker.image import process_image
 from worker.rate_limit import RateLimitedClientSession
 from PIL import Image
-from functools import partial
 
 
 log.basicConfig(level=log.DEBUG)
@@ -47,6 +48,8 @@ async def test_pipeline():
 async def test_handles_corrupt_images_gracefully():
     redis = FakeRedis()
     stats = StatsManager(redis)
+    kafka = FakeProducer()
+    producer = MetadataProducer(kafka)
     await process_image(
         persister=validate_thumbnail,
         session=RateLimitedClientSession(FakeAioSession(corrupt=True), redis),
@@ -54,8 +57,14 @@ async def test_handles_corrupt_images_gracefully():
         identifier='4bbfe191-1cca-4b9e-aff0-1d3044ef3f2d',
         stats=stats,
         source='example',
-        semaphore=asyncio.BoundedSemaphore(1000)
+        semaphore=asyncio.BoundedSemaphore(1000),
+        metadata_producer=producer
     )
+    producer_task = asyncio.create_task(producer.listen())
+    try:
+        await asyncio.wait_for(producer_task, 0.01)
+    except concurrent.futures.TimeoutError:
+        pass
 
 
 @pytest.mark.asyncio
@@ -112,12 +121,16 @@ async def producer_fixture():
     return kafka
 
 
-def test_resolution_messaging(producer_fixture):
+def test_quality_messaging(producer_fixture):
     resolution_msg = producer_fixture.messages[0]
     parsed = json.loads(str(resolution_msg, 'utf-8'))
-    expected_fields = ['height', 'width', 'identifier']
+    expected_fields = [
+        'height', 'width', 'identifier', 'compression_quality', 'filesize'
+    ]
     for field in expected_fields:
         assert field in parsed
+        assert parsed[field] is not None
+        assert parsed[field] != ''
 
 
 def test_exif_messaging(producer_fixture):

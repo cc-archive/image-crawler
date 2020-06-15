@@ -1,5 +1,4 @@
 import os
-from collections import namedtuple
 
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
 KAFKA_HOSTS = os.getenv('KAFKA_HOSTS', 'kafka:9092')

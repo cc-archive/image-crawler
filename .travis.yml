@@ -6,6 +6,7 @@ install:
   - pipenv install --system --deploy
 before_install:
   - "export PYTHONPATH=$PYTHONPATH:$(pwd)"
+  - sudo apt-get install libmagickwand-dev
 script:
   - pycodestyle . --max-line-length=80 --ignore=E402,W503
   - PYTHONPATH=. pipenv run pytest -s

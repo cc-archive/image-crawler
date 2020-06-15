@@ -1,9 +1,11 @@
 import asyncio
+import wand.image
 from functools import partial
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from worker import settings as settings
 from worker.stats_reporting import StatsManager
+from wand.exceptions import WandException
 
 
 async def process_image(
@@ -32,15 +34,15 @@ async def process_image(
         buffer = BytesIO(await img_resp.read())
         try:
             img = await loop.run_in_executor(None, partial(Image.open, buffer))
+            if metadata_producer:
+                notify_quality(img, buffer, identifier, metadata_producer)
+                notify_exif(img, identifier, metadata_producer)
         except UnidentifiedImageError:
             await stats.record_error(
                 source,
                 code="UnidentifiedImageError"
             )
             return
-        if metadata_producer:
-            notify_resolution(img, identifier, metadata_producer)
-            notify_exif(img, identifier, metadata_producer)
         thumb = await loop.run_in_executor(
             None, partial(thumbnail_image, img)
         )
@@ -58,10 +60,18 @@ def thumbnail_image(img: Image):
     return output
 
 
-def notify_resolution(img: Image, identifier, metadata_producer):
-    """ Collect dimensions metadata. """
+def notify_quality(img: Image, buffer, identifier, metadata_producer):
+    """ Collect quality metadata. """
     height, width = img.size
-    metadata_producer.notify_image_size_update(height, width, identifier)
+    filesize = buffer.getbuffer().nbytes
+    buffer.seek(0)
+    try:
+        compression_quality = wand.image.Image(file=buffer).compression_quality
+    except WandException:
+        compression_quality = None
+    metadata_producer.notify_image_quality_update(
+        height, width, identifier, filesize, compression_quality
+    )
 
 
 def notify_exif(img: Image, identifier, metadata_producer):
