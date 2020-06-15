@@ -28,6 +28,8 @@ async def process_image(
     async with semaphore:
         loop = asyncio.get_event_loop()
         img_resp = await session.get(url, source)
+        if not img_resp:
+            return
         if img_resp.status >= 400:
             await stats.record_error(source, code=img_resp.status)
             return
