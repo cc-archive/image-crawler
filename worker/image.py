@@ -29,8 +29,9 @@ async def process_image(
         loop = asyncio.get_event_loop()
         img_resp = await session.get(url, source)
         if not img_resp:
+            await stats.record_error(source, code="NoRateToken")
             return
-        if img_resp.status >= 400:
+        elif img_resp.status >= 400:
             await stats.record_error(source, code=img_resp.status)
             return
         buffer = BytesIO(await img_resp.read())
