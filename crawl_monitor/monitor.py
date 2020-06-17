@@ -8,6 +8,7 @@ from crawl_monitor.structured_logging import log_state
 from crawl_monitor.source_splitter import SourceSplitter
 from worker.util import kafka_connect
 from multiprocessing import Process
+from multiprocessing_logging import install_mp_handler
 
 
 async def monitor():
@@ -38,7 +39,8 @@ def run_splitter():
 
 
 if __name__ == '__main__':
+    log.basicConfig(level=log.INFO)
+    install_mp_handler()
     p = Process(target=run_splitter)
     p.start()
-    log.basicConfig(level=log.INFO)
     asyncio.run(monitor())

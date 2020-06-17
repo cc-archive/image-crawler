@@ -8,6 +8,7 @@ from pykafka import KafkaClient
 """
 Schedules URLs for crawling from a TSV file.
 """
+log.basicConfig(level=log.INFO)
 
 
 def _parse_row(row):
@@ -33,10 +34,13 @@ parser.add_argument(
 parsed_args = parser.parse_args()
 tsv_path = parsed_args.tsv_path[0]
 in_tsv = open(tsv_path, 'r')
+hosts = parsed_args.kafka_hosts[0]
+log.info(f'Connecting to Kafka broker(s): {hosts}')
 client = KafkaClient(hosts=parsed_args.kafka_hosts[0])
 topic = client.topics['inbound_images']
 reader = csv.DictReader(in_tsv, delimiter='\t')
 start = time.monotonic()
+log.info('Beginning production of messages')
 with topic.get_producer(
         use_rdkafka=True,
         max_queued_messages=5000000,
