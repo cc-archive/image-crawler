@@ -26,9 +26,14 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     'tsv_path', metavar='f', type=str, nargs=1, help='A TSV file'
 )
-tsv_path = parser.parse_args().tsv_path
+parser.add_argument(
+    'kafka_hosts', metavar='h', type=str, nargs=1,
+    help='A comma separated list of Kafka hosts, e.g. 127.0.0.1:9092.'
+)
+parsed_args = parser.parse_args()
+tsv_path = parsed_args.tsv_path
 in_tsv = open(tsv_path, 'r')
-client = KafkaClient(hosts='kafka:9092')
+client = KafkaClient(hosts=parsed_args.kafka_hosts)
 topic = client.topics['inbound_images']
 reader = csv.DictReader(in_tsv, delimiter='\t')
 start = time.monotonic()
