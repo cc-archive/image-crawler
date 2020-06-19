@@ -38,8 +38,11 @@ ERROR_TOLERANCE_PERCENT = 10
 EXPECTED_STATUSES = {
     '200',
     '404',
+    '300',
     '301',
-    'UnidentifiedImageError'
+    '302',
+    'UnidentifiedImageError',
+    'NoRateToken'
 }
 
 # Set tracking the domains we are crawling

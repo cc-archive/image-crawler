@@ -65,7 +65,7 @@ def thumbnail_image(img: Image):
     output = BytesIO()
     if img.mode != 'RGB':
         img = img.convert('RGB')
-    img.save(output, format="JPEG", quality=30)
+    img.save(output, format="JPEG", quality=50)
     output.seek(0)
     return output
 
