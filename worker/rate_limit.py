@@ -12,7 +12,7 @@ replenished.
 # ex: currtokens:staticflickr.com
 CURRTOKEN_PREFIX = 'currtokens:'
 # Amount of time to block for tokens before giving up
-MAX_WAIT = dt.timedelta(hours=6)
+MAX_WAIT = dt.timedelta(minutes=15)
 
 
 class RateLimitedClientSession:

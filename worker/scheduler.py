@@ -49,6 +49,16 @@ class CrawlScheduler:
         return msgs
 
     @staticmethod
+    def _log_schedule_state(task_schedule):
+        counts = {}
+        for source in task_schedule:
+            count = len(task_schedule[source])
+            if count:
+                counts[source] = count
+        if counts:
+            log.info(f'Schedule per source: {counts}')
+
+    @staticmethod
     def _get_unfinished_tasks(task_schedule, source):
         try:
             tasks = task_schedule[source]
@@ -100,6 +110,8 @@ class CrawlScheduler:
         to_schedule = {}
         for source in sources:
             num_unfinished = self._get_unfinished_tasks(task_schedule, source)
+            if num_unfinished:
+                log.info(f'{source} has {num_unfinished} pending tasks')
             num_to_schedule = share - num_unfinished
             consumer = self._get_consumer(source)
             source_msgs = self._consume_n(consumer, num_to_schedule)
@@ -112,6 +124,7 @@ class CrawlScheduler:
         semaphore = asyncio.BoundedSemaphore(settings.MAX_TASKS)
         while True:
             to_schedule = await self._schedule(task_schedule)
+            self._log_schedule_state(task_schedule)
             for source in to_schedule:
                 # Cull finished tasks
                 running = []
@@ -150,8 +163,9 @@ async def setup_io():
         .get_producer(use_rdkafka=True)
     producer = MetadataProducer(producer=metadata_updates)
     redis_client = aredis.StrictRedis(host=settings.REDIS_HOST)
+    connector = aiohttp.TCPConnector(ssl=False)
     aiosession = RateLimitedClientSession(
-        aioclient=aiohttp.ClientSession(),
+        aioclient=aiohttp.ClientSession(connector=connector),
         redis=redis_client
     )
     stats = StatsManager(redis_client)

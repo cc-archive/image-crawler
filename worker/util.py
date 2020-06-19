@@ -58,12 +58,16 @@ class MetadataProducer:
         self._metadata_messages.append(msg_bytes)
 
     def notify_exif_update(self, identifier, exif):
-        msg = json.dumps(
-            {
-                'exif': exif,
-                'identifier': identifier
-            }
-        )
+        try:
+            msg = json.dumps(
+                {
+                    'exif': exif,
+                    'identifier': identifier
+                }
+            )
+        except TypeError:
+            log.info(f'Failed to record exif for {identifier}')
+            return
         msg_bytes = bytes(msg, 'utf-8')
         self._metadata_messages.append(msg_bytes)
 

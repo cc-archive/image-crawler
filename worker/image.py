@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 import wand.image
 from functools import partial
 from io import BytesIO
@@ -27,7 +28,11 @@ async def process_image(
     """
     async with semaphore:
         loop = asyncio.get_event_loop()
-        img_resp = await session.get(url, source)
+        try:
+            img_resp = await session.get(url, source)
+        except aiohttp.client_exceptions.ServerDisconnectedError:
+            await stats.record_error(source, code="ServerDisconnected")
+            return
         if not img_resp:
             await stats.record_error(source, code="NoRateToken")
             return
@@ -58,6 +63,8 @@ async def process_image(
 def thumbnail_image(img: Image):
     img.thumbnail(size=settings.TARGET_RESOLUTION, resample=Image.NEAREST)
     output = BytesIO()
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
     img.save(output, format="JPEG", quality=30)
     output.seek(0)
     return output

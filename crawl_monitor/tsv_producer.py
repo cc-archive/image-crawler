@@ -3,6 +3,7 @@ import time
 import csv
 import argparse
 import logging as log
+from urllib.parse import urlparse
 from pykafka import KafkaClient
 
 """
@@ -14,11 +15,19 @@ log.basicConfig(level=log.INFO)
 def _parse_row(row):
     """ Read a row from the TSV and encode it as a message. """
     parsed = {
-        'url': row['url'],
+        'url': _add_protocol(row['url']),
         'uuid': row['identifier'],
         'source': row['source']
     }
     return bytes(json.dumps(parsed), 'utf-8')
+
+
+def _add_protocol(url: str):
+    parsed = urlparse(url)
+    if parsed.scheme == '':
+        return 'http://' + url
+    else:
+        return url
 
 
 parser = argparse.ArgumentParser(
