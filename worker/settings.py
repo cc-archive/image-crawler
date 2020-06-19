@@ -11,7 +11,7 @@ ZOOKEEPER_HOST = os.getenv('ZOOKEEPER_HOST', 'zookeeper:2181')
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
 
 # Thumbnail size
-TARGET_RESOLUTION = (640, 480)
+TARGET_RESOLUTION = (640, 640)
 
 # Number of tasks to schedule (but not necessarily execute) simultaneously.
 # Each pending resize task takes ~3kb of memory, so scheduling 1MM events means
