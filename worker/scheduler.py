@@ -194,9 +194,12 @@ async def listen():
     Listen for image events forever.
     """
     metadata_producer, retry_producer, scheduler = await setup_io()
-    producer_task = asyncio.create_task(metadata_producer)
+    meta_producer_task = asyncio.create_task(metadata_producer)
+    retry_producer_task = asyncio.create_task(retry_producer)
     scheduler_task = asyncio.create_task(scheduler)
-    await asyncio.wait([producer_task, retry_producer, scheduler_task])
+    await asyncio.wait(
+        [meta_producer_task, retry_producer_task, scheduler_task]
+    )
 
 if __name__ == '__main__':
     log.basicConfig(level=log.INFO)
