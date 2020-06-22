@@ -47,6 +47,7 @@ class SourceSplitter:
 
     def split(self):
         redis_client = redis.StrictRedis(settings.REDIS_HOST)
+        log.info('Starting splitter')
         while True:
             msg_count = 0
             for msg in self.consumer:

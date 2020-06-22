@@ -15,6 +15,7 @@ redis = "*"
 PyExifTool = "*"
 exifread = "*"
 wand = "*"
+multiprocessing-logging = "*"
 
 [dev-packages]
 

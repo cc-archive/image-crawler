@@ -1,5 +1,6 @@
 import asyncio
-
+import datetime as dt
+from crawl_monitor.structured_logging import json_log
 """
 Every TLD (e.g. flickr.com, metmuseum.org) gets a token bucket. Before a worker
 crawls an image from a domain, it must acquire a token from the right bucket.
@@ -10,6 +11,8 @@ replenished.
 # Prefix for keys tracking TLD rate limits
 # ex: currtokens:staticflickr.com
 CURRTOKEN_PREFIX = 'currtokens:'
+# Amount of time to block for tokens before giving up
+MAX_WAIT = dt.timedelta(hours=6)
 
 
 class RateLimitedClientSession:
@@ -38,6 +41,17 @@ class RateLimitedClientSession:
 
     async def get(self, url, source):
         token_acquired = False
+        deadline = dt.datetime.utcnow() + MAX_WAIT
         while not token_acquired:
             token_acquired = await self._get_token(source)
+            if deadline < dt.datetime.utcnow():
+                msg = {
+                    'event': 'rate_limit_timeout',
+                    'url': url,
+                    'source': source,
+                    'msg': 'A rate limit token was not acquired before the '
+                           'deadline.'
+                }
+                json_log(msg)
+                return None
         return await self.client.get(url)

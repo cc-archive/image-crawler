@@ -13,7 +13,7 @@ services:
       - "2181:2181"
     restart: always
   kafka:
-    image: wurstmeister/kafka
+    image: wurstmeister/kafka:2.12-2.2.1
     ports:
       - "9092:9092"
     environment:

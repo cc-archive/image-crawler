@@ -14,7 +14,7 @@ HALF_HOUR_SEC = 60 * 30
 MIN_CRAWL_SIZE = 5000
 MAX_CRAWL_SIZE = 500000000
 
-MIN_CRAWL_RPS = 0.2
+MIN_CRAWL_RPS = 1
 MAX_CRAWL_RPS = 200
 
 # Key for token replenishment
@@ -38,8 +38,11 @@ ERROR_TOLERANCE_PERCENT = 10
 EXPECTED_STATUSES = {
     '200',
     '404',
+    '300',
     '301',
-    'UnidentifiedImageError'
+    '302',
+    'UnidentifiedImageError',
+    'NoRateToken'
 }
 
 # Set tracking the domains we are crawling

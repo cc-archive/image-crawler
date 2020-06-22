@@ -69,7 +69,7 @@ class StatsManager:
 
     async def record_error(self, source, code):
         """
-        :param tld: The domain key for the associated URL.
+        :param source: The source key for the associated URL.
         :param code: An optional status code.
         """
         async with await self.redis.pipeline() as pipe:
