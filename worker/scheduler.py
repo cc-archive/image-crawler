@@ -8,8 +8,9 @@ import boto3
 import botocore.client
 from functools import partial
 from collections import defaultdict
-from worker.util import kafka_connect, parse_message, MetadataProducer
-from worker.image import process_image, save_thumbnail_s3
+from worker.util import kafka_connect, save_thumbnail_s3
+from worker.message import AsyncProducer, parse_message
+from worker.image import process_image
 from worker.rate_limit import RateLimitedClientSession
 from worker.stats_reporting import StatsManager
 
@@ -142,7 +143,8 @@ class CrawlScheduler:
                             url=msg['url'],
                             identifier=msg['uuid'],
                             source=source,
-                            semaphore=semaphore
+                            semaphore=semaphore,
+                            attempts=msg.get('attempts', None)
                         )
                     )
                     task_schedule[source].append(t)
@@ -161,7 +163,10 @@ async def setup_io():
     )
     metadata_updates = kafka_client.topics['image_metadata_updates'] \
         .get_producer(use_rdkafka=True)
-    producer = MetadataProducer(producer=metadata_updates)
+    retries = kafka_client.topics['inbound_images'] \
+        .get_producer(use_rdkafka=True)
+    metadata_producer = AsyncProducer(producer_topic=metadata_updates)
+    retry_producer = AsyncProducer(producer_topic=retries)
     redis_client = aredis.StrictRedis(host=settings.REDIS_HOST)
     connector = aiohttp.TCPConnector(ssl=False)
     aiosession = RateLimitedClientSession(
@@ -173,20 +178,25 @@ async def setup_io():
         process_image, session=aiosession,
         persister=partial(save_thumbnail_s3, s3_client=s3),
         stats=stats,
-        metadata_producer=producer
+        metadata_producer=metadata_producer,
+        retry_producer=retry_producer
     )
     scheduler = CrawlScheduler(kafka_client, redis_client, image_processor)
-    return producer.listen(), scheduler.schedule_loop()
+    return (
+        metadata_producer.listen(),
+        retry_producer.listen(),
+        scheduler.schedule_loop()
+    )
 
 
 async def listen():
     """
     Listen for image events forever.
     """
-    producer, scheduler = await setup_io()
-    producer_task = asyncio.create_task(producer)
+    metadata_producer, retry_producer, scheduler = await setup_io()
+    producer_task = asyncio.create_task(metadata_producer)
     scheduler_task = asyncio.create_task(scheduler)
-    await asyncio.wait([producer_task, scheduler_task])
+    await asyncio.wait([producer_task, retry_producer, scheduler_task])
 
 if __name__ == '__main__':
     log.basicConfig(level=log.INFO)
