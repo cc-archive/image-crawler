@@ -1,7 +1,6 @@
 import logging as log
 import time
 from io import BytesIO
-
 import pykafka
 import worker.settings as settings
 

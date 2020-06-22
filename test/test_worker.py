@@ -82,7 +82,7 @@ async def test_records_errors():
         stats=stats,
         source='example',
         semaphore=asyncio.BoundedSemaphore(1000),
-        retry_producer=producer,
+        retry_producer=producer
     )
     expected_keys = [
         'resize_errors',

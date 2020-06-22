@@ -28,7 +28,6 @@ async def _handle_error(
 ):
     if attempts is None:
         attempts = 0
-    log.info(f'attempts: {attempts}')
     attempts_remaining = attempts < MAX_RETRIES
     await stats.record_error(source, code=err_code)
     if err_code in RETRY_CODES and attempts_remaining and retry_producer:
