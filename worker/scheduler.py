@@ -197,8 +197,8 @@ async def listen():
     """
     Listen for image events forever.
     """
-    metadata_producer, retry_producer, rot_producer, scheduler = await setup_io()
-    meta_producer_task = asyncio.create_task(metadata_producer)
+    meta_producer, retry_producer, rot_producer, scheduler = await setup_io()
+    meta_producer_task = asyncio.create_task(meta_producer)
     retry_producer_task = asyncio.create_task(retry_producer)
     rot_producer_task = asyncio.create_task(rot_producer)
     scheduler_task = asyncio.create_task(scheduler)
