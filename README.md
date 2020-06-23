@@ -91,6 +91,17 @@ Example: discovering the EXIF metadata of an image. The below example contains a
 }
 ```
 
+### `link_rot`
+The `link_rot` topic contains the identifiers of images that appear to have been deleted from their original source.
+
+Example: a 404'd image.
+```json
+{
+    "identifier": "7563efd4-58d0-41eb-9a4f-3903d36a5225",
+    "time": "2020-06-23T14:30:22.129148"
+}
+```
+
 # Monitoring the crawl
 
 The `crawl_monitor` logs useful information about the crawl in a machine-friendly format. There are several different types of events that will appear in the logger.

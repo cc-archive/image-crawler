@@ -68,6 +68,36 @@ async def test_handles_corrupt_images_gracefully():
 
 
 @pytest.mark.asyncio
+async def test_handled_404s():
+    redis = FakeRedis()
+    stats = StatsManager(redis)
+    kafka = FakeProducer()
+    rot_producer = AsyncProducer(kafka)
+    session = RateLimitedClientSession(
+        FakeAioSession(corrupt=True, status=404), redis
+    )
+    ident = '4bbfe191-1cca-4b9e-aff0-1d3044ef3f2d'
+    await process_image(
+        persister=validate_thumbnail,
+        session=session,
+        url='fake_url',
+        identifier=ident,
+        stats=stats,
+        source='example',
+        semaphore=asyncio.BoundedSemaphore(1000),
+        rot_producer=rot_producer
+    )
+    producer_task = asyncio.create_task(rot_producer.listen())
+    try:
+        await asyncio.wait_for(producer_task, 0.01)
+    except concurrent.futures.TimeoutError:
+        pass
+    rot_msg = kafka.messages[0]
+    parsed = json.loads(str(rot_msg, 'utf-8'))
+    assert ident == parsed['identifier']
+
+
+@pytest.mark.asyncio
 async def test_records_errors():
     redis = FakeRedis()
     stats = StatsManager(redis)

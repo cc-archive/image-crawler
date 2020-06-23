@@ -3,6 +3,7 @@ import json
 import logging as log
 import time
 import wand.image
+import datetime as dt
 from wand.exceptions import WandException
 
 from PIL import Image
@@ -96,5 +97,14 @@ def notify_retry(identifier, source, url, attempts, retry_producer):
             'uuid': identifier,
             'source': source,
             'attempts': attempts
+        }
+    )
+
+
+def notify_404(identifier, link_rot_producer):
+    link_rot_producer.enqueue_message(
+        {
+            'identifier': identifier,
+            'timestamp': dt.datetime.utcnow().isoformat()
         }
     )

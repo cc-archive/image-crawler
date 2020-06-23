@@ -5,7 +5,7 @@ from functools import partial
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from worker import settings as settings
-from worker.message import notify_quality, notify_exif, notify_retry
+from worker.message import notify_quality, notify_exif, notify_retry, notify_404
 from worker.stats_reporting import StatsManager
 
 NO_RATE_TOKEN = 'NoRateToken'
@@ -25,8 +25,8 @@ MAX_RETRIES = 1
 
 
 async def _handle_error(
-        retry_producer, stats, identifier, source, url, err_code=None,
-        attempts=None
+        retry_producer, rot_producer, stats, identifier, source, url,
+        err_code=None, attempts=None
 ):
     if attempts is None:
         attempts = 0
@@ -36,11 +36,14 @@ async def _handle_error(
         log.info(f'Retrying {url} later')
         attempts += 1
         notify_retry(identifier, source, url, attempts, retry_producer)
+    elif err_code == 404 and rot_producer:
+        notify_404(identifier, rot_producer)
 
 
 async def process_image(
         persister, session, url, identifier, stats: StatsManager, source,
-        semaphore, metadata_producer=None, retry_producer=None, attempts=None
+        semaphore, metadata_producer=None, retry_producer=None,
+        rot_producer=None, attempts=None
 ):
     """
     Get an image, collect dimensions metadata, thumbnail it, and persist it.
@@ -56,14 +59,15 @@ async def process_image(
     :param metadata_producer: The outbound message queue for dimensions
     metadata.
     :param retry_producer: The outbound message queue for download retries.
+    :param rot_producer: The outbound message queue for detecting link rot.
     :param attempts: The number of times we have tried and failed to download
     the image.
     """
     async with semaphore:
         loop = asyncio.get_event_loop()
         report_err = partial(
-            _handle_error, retry_producer, stats, identifier, source, url,
-            attempts=attempts
+            _handle_error, retry_producer, rot_producer, stats, identifier,
+            source, url, attempts=attempts
         )
         try:
             img_resp = await session.get(url, source)

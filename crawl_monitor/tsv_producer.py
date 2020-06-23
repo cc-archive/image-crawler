@@ -53,7 +53,8 @@ log.info('Beginning production of messages')
 with topic.get_producer(
         use_rdkafka=True,
         max_queued_messages=5000000,
-        block_on_queue_full=True) as producer:
+        block_on_queue_full=True
+) as producer:
     for idx, row in enumerate(reader):
         encoded = _parse_row(row)
         producer.produce(encoded)
