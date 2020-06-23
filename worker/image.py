@@ -13,8 +13,10 @@ SERVER_DISCONNECTED = 'ServerDisconnected'
 
 RETRY_CODES = {
     400,
+    401,
     403,
     429,
+    500,
     NO_RATE_TOKEN,
     SERVER_DISCONNECTED
 }
