@@ -155,7 +155,7 @@ async def setup_io():
     """
     Set up all IO used by the scheduler.
 
-    :return A list of awaitable tasks
+    :return A tuple of awaitable tasks
     """
     kafka_client = kafka_connect()
     s3 = boto3.client(
