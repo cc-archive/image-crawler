@@ -3,7 +3,7 @@ import pytest
 import asyncio
 import logging as log
 import concurrent.futures
-from worker.util import MetadataProducer
+from worker.message import AsyncProducer
 from test.mocks import (
     FakeConsumer, FakeAioSession, FakeRedis, AioNetworkSimulatingSession,
     FakeProducer
@@ -49,7 +49,7 @@ async def test_handles_corrupt_images_gracefully():
     redis = FakeRedis()
     stats = StatsManager(redis)
     kafka = FakeProducer()
-    producer = MetadataProducer(kafka)
+    producer = AsyncProducer(kafka)
     await process_image(
         persister=validate_thumbnail,
         session=RateLimitedClientSession(FakeAioSession(corrupt=True), redis),
@@ -68,10 +68,42 @@ async def test_handles_corrupt_images_gracefully():
 
 
 @pytest.mark.asyncio
+async def test_handled_404s():
+    redis = FakeRedis()
+    stats = StatsManager(redis)
+    kafka = FakeProducer()
+    rot_producer = AsyncProducer(kafka)
+    session = RateLimitedClientSession(
+        FakeAioSession(corrupt=True, status=404), redis
+    )
+    ident = '4bbfe191-1cca-4b9e-aff0-1d3044ef3f2d'
+    await process_image(
+        persister=validate_thumbnail,
+        session=session,
+        url='fake_url',
+        identifier=ident,
+        stats=stats,
+        source='example',
+        semaphore=asyncio.BoundedSemaphore(1000),
+        rot_producer=rot_producer
+    )
+    producer_task = asyncio.create_task(rot_producer.listen())
+    try:
+        await asyncio.wait_for(producer_task, 0.01)
+    except concurrent.futures.TimeoutError:
+        pass
+    rot_msg = kafka.messages[0]
+    parsed = json.loads(str(rot_msg, 'utf-8'))
+    assert ident == parsed['identifier']
+
+
+@pytest.mark.asyncio
 async def test_records_errors():
     redis = FakeRedis()
     stats = StatsManager(redis)
     session = RateLimitedClientSession(FakeAioSession(status=403), redis)
+    retry_producer = FakeProducer()
+    producer = AsyncProducer(retry_producer)
     await process_image(
         persister=validate_thumbnail,
         session=session,
@@ -79,7 +111,8 @@ async def test_records_errors():
         identifier='4bbfe191-1cca-4b9e-aff0-1d3044ef3f2d',
         stats=stats,
         source='example',
-        semaphore=asyncio.BoundedSemaphore(1000)
+        semaphore=asyncio.BoundedSemaphore(1000),
+        retry_producer=producer
     )
     expected_keys = [
         'resize_errors',
@@ -92,6 +125,14 @@ async def test_records_errors():
     for key in expected_keys:
         val = redis.store[key]
         assert val == 1 or len(val) == 1
+    producer_task = asyncio.create_task(producer.listen())
+    try:
+        await asyncio.wait_for(producer_task, 0.01)
+    except concurrent.futures.TimeoutError:
+        pass
+    retry = retry_producer.messages[0]
+    parsed = json.loads(str(retry, 'utf-8'))
+    assert parsed['attempts'] == 1
 
 
 @pytest.fixture
@@ -101,8 +142,9 @@ async def producer_fixture():
     # producer
     redis = FakeRedis()
     stats = StatsManager(redis)
-    kafka = FakeProducer()
-    producer = MetadataProducer(kafka)
+    meta_producer = FakeProducer()
+    retry_producer = FakeProducer()
+    producer = AsyncProducer(meta_producer)
     await process_image(
         persister=validate_thumbnail,
         session=RateLimitedClientSession(FakeAioSession(), redis),
@@ -111,18 +153,20 @@ async def producer_fixture():
         stats=stats,
         source='example',
         semaphore=asyncio.BoundedSemaphore(1000),
-        metadata_producer=producer
+        metadata_producer=producer,
+        retry_producer=retry_producer
     )
     producer_task = asyncio.create_task(producer.listen())
     try:
         await asyncio.wait_for(producer_task, 0.01)
     except concurrent.futures.TimeoutError:
         pass
-    return kafka
+    return meta_producer, retry_producer
 
 
 def test_quality_messaging(producer_fixture):
-    resolution_msg = producer_fixture.messages[0]
+    meta, _ = producer_fixture
+    resolution_msg = meta.messages[0]
     parsed = json.loads(str(resolution_msg, 'utf-8'))
     expected_fields = [
         'height', 'width', 'identifier', 'compression_quality', 'filesize'
@@ -134,7 +178,13 @@ def test_quality_messaging(producer_fixture):
 
 
 def test_exif_messaging(producer_fixture):
-    exif_msg = producer_fixture.messages[1]
+    meta, _ = producer_fixture
+    exif_msg = meta.messages[1]
     parsed = json.loads(str(exif_msg, 'utf-8'))
     artist_key = '0x13b'
     assert parsed['exif'][artist_key] == 'unknown'
+
+
+def test_retries(producer_fixture):
+    _, retries = producer_fixture
+    assert retries.messages == []

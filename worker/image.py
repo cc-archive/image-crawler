@@ -1,17 +1,50 @@
 import asyncio
 import aiohttp
-import wand.image
+import logging as log
 from functools import partial
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from worker import settings as settings
+from worker.message import notify_quality, notify_exif, notify_retry, notify_404
 from worker.stats_reporting import StatsManager
-from wand.exceptions import WandException
+
+NO_RATE_TOKEN = 'NoRateToken'
+SERVER_DISCONNECTED = 'ServerDisconnected'
+
+RETRY_CODES = {
+    400,
+    401,
+    403,
+    429,
+    500,
+    NO_RATE_TOKEN,
+    SERVER_DISCONNECTED
+}
+
+MAX_RETRIES = 1
+
+
+async def _handle_error(
+        retry_producer, rot_producer, stats, identifier, source, url,
+        err_code=None, attempts=None
+):
+    if attempts is None:
+        attempts = 0
+    attempts_remaining = attempts < MAX_RETRIES
+    await stats.record_error(source, code=err_code)
+    if err_code in RETRY_CODES and attempts_remaining and retry_producer:
+        log.info(f'Retrying {url} later')
+        attempts += 1
+        notify_retry(identifier, source, url, attempts, retry_producer)
+    elif err_code == 404 and rot_producer:
+        notify_404(identifier, rot_producer)
 
 
 async def process_image(
         persister, session, url, identifier, stats: StatsManager, source,
-        semaphore, metadata_producer=None):
+        semaphore, metadata_producer=None, retry_producer=None,
+        rot_producer=None, attempts=None
+):
     """
     Get an image, collect dimensions metadata, thumbnail it, and persist it.
     :param stats: A StatsManager for recording task statuses.
@@ -25,19 +58,27 @@ async def process_image(
     :param url: The URL of the image.
     :param metadata_producer: The outbound message queue for dimensions
     metadata.
+    :param retry_producer: The outbound message queue for download retries.
+    :param rot_producer: The outbound message queue for detecting link rot.
+    :param attempts: The number of times we have tried and failed to download
+    the image.
     """
     async with semaphore:
         loop = asyncio.get_event_loop()
+        report_err = partial(
+            _handle_error, retry_producer, rot_producer, stats, identifier,
+            source, url, attempts=attempts
+        )
         try:
             img_resp = await session.get(url, source)
         except aiohttp.client_exceptions.ServerDisconnectedError:
-            await stats.record_error(source, code="ServerDisconnected")
+            await report_err(err_code='ServerDisconnected')
             return
         if not img_resp:
-            await stats.record_error(source, code="NoRateToken")
+            await report_err(err_code='NoRateToken')
             return
         elif img_resp.status >= 400:
-            await stats.record_error(source, code=img_resp.status)
+            await report_err(err_code=img_resp.status)
             return
         buffer = BytesIO(await img_resp.read())
         try:
@@ -46,10 +87,7 @@ async def process_image(
                 notify_quality(img, buffer, identifier, metadata_producer)
                 notify_exif(img, identifier, metadata_producer)
         except UnidentifiedImageError:
-            await stats.record_error(
-                source,
-                code="UnidentifiedImageError"
-            )
+            await report_err(err_code='UnidentifiedImageError')
             return
         thumb = await loop.run_in_executor(
             None, partial(thumbnail_image, img)
@@ -65,35 +103,6 @@ def thumbnail_image(img: Image):
     output = BytesIO()
     if img.mode != 'RGB':
         img = img.convert('RGB')
-    img.save(output, format="JPEG", quality=50)
+    img.save(output, format='JPEG', quality=50)
     output.seek(0)
     return output
-
-
-def notify_quality(img: Image, buffer, identifier, metadata_producer):
-    """ Collect quality metadata. """
-    height, width = img.size
-    filesize = buffer.getbuffer().nbytes
-    buffer.seek(0)
-    try:
-        compression_quality = wand.image.Image(file=buffer).compression_quality
-    except WandException:
-        compression_quality = None
-    metadata_producer.notify_image_quality_update(
-        height, width, identifier, filesize, compression_quality
-    )
-
-
-def notify_exif(img: Image, identifier, metadata_producer):
-    if 'exif' in img.info:
-        exif = {hex(k): v for k, v in img.getexif().items()}
-        if exif:
-            metadata_producer.notify_exif_update(identifier, exif)
-
-
-def save_thumbnail_s3(s3_client, img: BytesIO, identifier):
-    s3_client.put_object(
-        Bucket='cc-image-analysis',
-        Key=f'{identifier}.jpg',
-        Body=img
-    )
