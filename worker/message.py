@@ -34,7 +34,9 @@ class AsyncProducer:
             _msg_json = json.dumps(msg)
             _msg = bytes(_msg_json, 'utf-8')
         except TypeError:
-            log.warning(f'Failed to encode message: {msg}')
+            ident = msg.get('identifier', '')
+            log.warning(f'Failed to encode message with keys: '
+                        f'{list([msg.keys()])}. Identifier: {ident}')
             return
         self._messages.append(_msg)
 

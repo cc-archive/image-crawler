@@ -13,6 +13,7 @@ from worker.message import AsyncProducer, parse_message
 from worker.image import process_image
 from worker.rate_limit import RateLimitedClientSession
 from worker.stats_reporting import StatsManager
+from pykafka.exceptions import SocketDisconnectedError
 
 
 class CrawlScheduler:
@@ -32,8 +33,7 @@ class CrawlScheduler:
         self.consumers = {}
         self.image_processor = image_processor
 
-    @staticmethod
-    def _consume_n(consumer, n):
+    def _consume_n(self, consumer, n):
         """
         Consume N messages from a Kafka topic consumer.
 
@@ -42,11 +42,15 @@ class CrawlScheduler:
         messages_remaining = True
         msgs = []
         while len(msgs) < n and messages_remaining:
-            msg = consumer.consume(block=False)
-            if msg:
-                msgs.append(parse_message(msg))
-            else:
-                messages_remaining = False
+            try:
+                msg = consumer.consume(block=False)
+                if msg:
+                    msgs.append(parse_message(msg))
+                else:
+                    messages_remaining = False
+            except SocketDisconnectedError:
+                consumer.stop()
+                consumer.start()
         return msgs
 
     @staticmethod
@@ -115,7 +119,7 @@ class CrawlScheduler:
                 log.info(f'{source} has {num_unfinished} pending tasks')
             num_to_schedule = share - num_unfinished
             consumer = self._get_consumer(source)
-            source_msgs = self._consume_n(consumer, num_to_schedule)
+            source_msgs = self._consume_n(consumer, num_to_schedule, source)
             to_schedule[source] = source_msgs
         return to_schedule
 
@@ -217,3 +221,4 @@ async def listen():
 if __name__ == '__main__':
     log.basicConfig(level=log.INFO)
     asyncio.run(listen())
+    log.info('Shutting down worker.')

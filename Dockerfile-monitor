@@ -6,5 +6,5 @@ COPY . /monitor/
 RUN apt-get update
 RUN apt-get -y install librdkafka1 librdkafka-dev
 RUN RDKAFKA_INSTALL=system pipenv install
-
+ENV PYTHONUNBUFFERED 1
 CMD PYTHONPATH=. pipenv run python crawl_monitor/monitor.py
