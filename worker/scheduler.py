@@ -32,8 +32,10 @@ class CrawlScheduler:
         self.redis = redis
         self.consumers = {}
         self.image_processor = image_processor
+        self.memtrack = None
 
-    def _consume_n(self, consumer, n):
+    @staticmethod
+    def _consume_n(consumer, n):
         """
         Consume N messages from a Kafka topic consumer.
 
@@ -119,7 +121,7 @@ class CrawlScheduler:
                 log.info(f'{source} has {num_unfinished} pending tasks')
             num_to_schedule = share - num_unfinished
             consumer = self._get_consumer(source)
-            source_msgs = self._consume_n(consumer, num_to_schedule, source)
+            source_msgs = self._consume_n(consumer, num_to_schedule)
             to_schedule[source] = source_msgs
         return to_schedule
 
@@ -127,6 +129,10 @@ class CrawlScheduler:
         """ Repeatedly schedule image processing tasks. """
         task_schedule = defaultdict(list)
         semaphore = asyncio.BoundedSemaphore(settings.MAX_TASKS)
+        if settings.PROFILE_MEMORY:
+            from pympler import tracker
+            self.memtrack = tracker.SummaryTracker()
+        iterations = 0
         while True:
             to_schedule = await self._schedule(task_schedule)
             self._log_schedule_state(task_schedule)
@@ -152,6 +158,10 @@ class CrawlScheduler:
                         )
                     )
                     task_schedule[source].append(t)
+            if iterations % 100 == 0:
+                log.info('Memory delta:')
+                self.memtrack.print_diff()
+            iterations += 1
             await asyncio.sleep(5)
 
 

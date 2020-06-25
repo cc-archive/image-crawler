@@ -16,6 +16,7 @@ PyExifTool = "*"
 exifread = "*"
 wand = "*"
 multiprocessing-logging = "*"
+pympler = "*"
 
 [dev-packages]
 
