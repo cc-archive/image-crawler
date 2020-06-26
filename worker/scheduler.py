@@ -158,7 +158,7 @@ class CrawlScheduler:
                         )
                     )
                     task_schedule[source].append(t)
-            if iterations % 100 == 0:
+            if settings.PROFILE_MEMORY and iterations % 100 == 0:
                 log.info('Memory delta:')
                 self.memtrack.print_diff()
             iterations += 1
