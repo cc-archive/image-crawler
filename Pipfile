@@ -17,6 +17,7 @@ exifread = "*"
 wand = "*"
 multiprocessing-logging = "*"
 pympler = "*"
+confluent-kafka = "*"
 
 [dev-packages]
 

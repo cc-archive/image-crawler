@@ -2,6 +2,7 @@ import json
 import logging as log
 import redis
 import crawl_monitor.settings as settings
+from pykafka.exceptions import SocketDisconnectedError
 
 
 NUM_SPLIT = 'num_split'
@@ -63,7 +64,11 @@ class SourceSplitter:
                     producer = self.producers[source]
                     del parsed['source']
                     encoded_msg = bytes(json.dumps(parsed), 'utf-8')
-                    producer.produce(encoded_msg)
+                    try:
+                        producer.produce(encoded_msg)
+                    except SocketDisconnectedError:
+                        producer.stop()
+                        producer.start()
                     msg_count += 1
                 if msg_count % 1000 == 0:
                     redis_client.incrby(NUM_SPLIT, 1000)
