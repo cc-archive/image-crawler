@@ -20,13 +20,14 @@ class AsyncProducer:
     and intermittently send them to Kafka synchronously. Launch
     `MetadataProducer.listen` as an asyncio task to do this.
     """
-    def __init__(self, producer_topic, frequency=60):
+    def __init__(self, producer, topic_name, frequency=60):
         """
-        :param producer_topic: A pykafka producer.
+        :param producer: A pykafka producer.
         :param frequency: How often to publish queued events.
         """
         self.frequency = frequency
-        self.producer = producer_topic
+        self.producer = producer,
+        self.topic_name = topic_name
         self._messages = []
 
     def enqueue_message(self, msg: dict):
@@ -48,7 +49,7 @@ class AsyncProducer:
                 log.info(f'Publishing {queue_size} events')
                 start = time.monotonic()
                 for msg in self._messages:
-                    self.producer.produce(msg)
+                    self.producer.produce(self.topic_name, msg)
                 rate = queue_size / (time.monotonic() - start)
                 self._messages = []
                 log.info(f'publish_rate={rate}/s')
@@ -56,7 +57,7 @@ class AsyncProducer:
 
 
 def parse_message(message):
-    decoded = json.loads(str(message.value, 'utf-8'))
+    decoded = json.loads(str(message.value(), 'utf-8'))
     return decoded
 
 

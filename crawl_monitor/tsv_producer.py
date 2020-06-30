@@ -49,14 +49,18 @@ reader = csv.DictReader(in_tsv, delimiter='\t')
 start = time.monotonic()
 log.info('Beginning production of messages')
 producer = Producer({'bootstrap.servers': hosts})
+count = 0
 for idx, row in enumerate(reader):
+    count = idx
     encoded = _parse_row(row)
-    try:
-        producer.produce('inbound_images', encoded)
-    except BufferError:
-        log.info('Waiting for signal from producer...')
-        producer.poll(1)
+    while True:
+        try:
+            producer.produce('inbound_images', encoded)
+        except BufferError:
+            # Give the producer time to catch up before retrying
+            producer.poll(1)
+        break
     if idx % 10000 == 0:
         log.info(f'Produced {idx} messages so far')
-print(f'Produced {idx} at rate {idx / (time.monotonic() - start)}/s')
+print(f'Produced {count} at rate {count / (time.monotonic() - start)}/s')
 in_tsv.close()

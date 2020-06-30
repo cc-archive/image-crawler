@@ -8,12 +8,12 @@ import boto3
 import botocore.client
 from functools import partial
 from collections import defaultdict
-from worker.util import kafka_connect, save_thumbnail_s3
+from worker.util import save_thumbnail_s3
 from worker.message import AsyncProducer, parse_message
 from worker.image import process_image
 from worker.rate_limit import RateLimitedClientSession
 from worker.stats_reporting import StatsManager
-from pykafka.exceptions import SocketDisconnectedError
+from confluent_kafka import Consumer, Producer
 
 
 class CrawlScheduler:
@@ -27,10 +27,9 @@ class CrawlScheduler:
     simultaneously instead of allowing one source to dominate all scraping
     resources.
     """
-    def __init__(self, kafka_client, redis, image_processor):
-        self.kafka_client = kafka_client
+    def __init__(self, consumer, redis, image_processor):
+        self.consumer = consumer
         self.redis = redis
-        self.consumers = {}
         self.image_processor = image_processor
         self.memtrack = None
 
@@ -44,15 +43,11 @@ class CrawlScheduler:
         messages_remaining = True
         msgs = []
         while len(msgs) < n and messages_remaining:
-            try:
-                msg = consumer.consume(block=False)
-                if msg:
-                    msgs.append(parse_message(msg))
-                else:
-                    messages_remaining = False
-            except SocketDisconnectedError:
-                consumer.stop()
-                consumer.start()
+            msg = consumer.poll(timeout=0.5)
+            if msg:
+                msgs.append(parse_message(msg))
+            else:
+                messages_remaining = False
         return msgs
 
     @staticmethod
@@ -72,21 +67,6 @@ class CrawlScheduler:
             return sum([not t.done() for t in tasks])
         except KeyError:
             return 0
-
-    def _get_consumer(self, source):
-        try:
-            return self.consumers[source]
-        except KeyError:
-            consumer = self.kafka_client \
-                .topics[f'{source}_urls'] \
-                .get_balanced_consumer(
-                    consumer_group='image_handlers',
-                    auto_commit_enable=True,
-                    zookeeper_connect=settings.ZOOKEEPER_HOST,
-                    use_rdkafka=True
-                )
-            self.consumers[source] = consumer
-            return consumer
 
     async def _schedule(self, task_schedule):
         """
@@ -120,8 +100,7 @@ class CrawlScheduler:
             if num_unfinished:
                 log.info(f'{source} has {num_unfinished} pending tasks')
             num_to_schedule = share - num_unfinished
-            consumer = self._get_consumer(source)
-            source_msgs = self._consume_n(consumer, num_to_schedule)
+            source_msgs = self._consume_n(self.consumer, num_to_schedule)
             to_schedule[source] = source_msgs
         return to_schedule
 
@@ -171,20 +150,15 @@ async def setup_io():
 
     :return A tuple of awaitable tasks
     """
-    kafka_client = kafka_connect()
     s3 = boto3.client(
         's3',
         settings.AWS_DEFAULT_REGION,
         config=botocore.client.Config(max_pool_connections=settings.MAX_TASKS)
     )
-    metadata_updates = kafka_client.topics['image_metadata_updates'] \
-        .get_producer(use_rdkafka=True)
-    retries = kafka_client.topics['inbound_images'] \
-        .get_producer(use_rdkafka=True)
-    link_rot = kafka_client.topics['link_rot'].get_producer(use_rdkafka=True)
-    metadata_producer = AsyncProducer(producer_topic=metadata_updates)
-    retry_producer = AsyncProducer(producer_topic=retries)
-    link_rot_producer = AsyncProducer(producer_topic=link_rot)
+    producer = Producer({'bootstrap.servers': settings.KAFKA_HOSTS})
+    metadata_producer = AsyncProducer(producer, 'image_metadata_updates')
+    retry_producer = AsyncProducer(producer, 'inbound_images')
+    link_rot_producer = AsyncProducer(producer, 'link_rot')
     redis_client = aredis.StrictRedis(host=settings.REDIS_HOST)
     connector = aiohttp.TCPConnector(ssl=False)
     aiosession = RateLimitedClientSession(
@@ -200,7 +174,13 @@ async def setup_io():
         retry_producer=retry_producer,
         rot_producer=link_rot_producer
     )
-    scheduler = CrawlScheduler(kafka_client, redis_client, image_processor)
+    consumer = Consumer({
+        'bootstrap.servers': settings.KAFKA_HOSTS,
+        'group.id': 'image_handlers',
+        'auto.offset.reset': 'earliest'
+    })
+    consumer.subscribe(['^urls.*'])
+    scheduler = CrawlScheduler(consumer, redis_client, image_processor)
     return (
         metadata_producer.listen(),
         retry_producer.listen(),
