@@ -44,7 +44,7 @@ class CrawlScheduler:
         messages_remaining = True
         msgs = []
         while len(msgs) < n and messages_remaining:
-            msg = consumer.poll(timeout=0.5)
+            msg = consumer.poll(timeout=0.1)
             if msg:
                 msgs.append(parse_message(msg))
             else:
@@ -74,7 +74,7 @@ class CrawlScheduler:
             return self.consumers[source]
         except KeyError:
             consumer = Consumer(self.consumer_settings)
-            consumer.subscribe(f'urls.{source}')
+            consumer.subscribe([f'urls.{source}'])
             self.consumers[source] = consumer
             log.info(f'Set up new consumer for {source} urls')
             return consumer
