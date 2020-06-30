@@ -27,8 +27,9 @@ class CrawlScheduler:
     simultaneously instead of allowing one source to dominate all scraping
     resources.
     """
-    def __init__(self, consumer, redis, image_processor):
-        self.consumer = consumer
+    def __init__(self, consumer_settings, redis, image_processor):
+        self.consumer_settings = consumer_settings
+        self.consumers = {}
         self.redis = redis
         self.image_processor = image_processor
         self.memtrack = None
@@ -68,6 +69,16 @@ class CrawlScheduler:
         except KeyError:
             return 0
 
+    def _get_consumer(self, source):
+        try:
+            return self.consumers[source]
+        except KeyError:
+            consumer = Consumer(self.consumer_settings)
+            consumer.subscribe(f'urls.{source}')
+            self.consumers[source] = consumer
+            log.info(f'Set up new consumer for {source} urls')
+            return consumer
+
     async def _schedule(self, task_schedule):
         """
         Divide available task slots proportionately between sources.
@@ -100,7 +111,8 @@ class CrawlScheduler:
             if num_unfinished:
                 log.info(f'{source} has {num_unfinished} pending tasks')
             num_to_schedule = share - num_unfinished
-            source_msgs = self._consume_n(self.consumer, num_to_schedule)
+            consumer = self._get_consumer(source)
+            source_msgs = self._consume_n(consumer, num_to_schedule)
             to_schedule[source] = source_msgs
         return to_schedule
 
@@ -174,13 +186,12 @@ async def setup_io():
         retry_producer=retry_producer,
         rot_producer=link_rot_producer
     )
-    consumer = Consumer({
+    consumer_settings = {
         'bootstrap.servers': settings.KAFKA_HOSTS,
         'group.id': 'image_handlers',
         'auto.offset.reset': 'earliest'
-    })
-    consumer.subscribe(['^urls.*'])
-    scheduler = CrawlScheduler(consumer, redis_client, image_processor)
+    }
+    scheduler = CrawlScheduler(consumer_settings, redis_client, image_processor)
     return (
         metadata_producer.listen(),
         retry_producer.listen(),
