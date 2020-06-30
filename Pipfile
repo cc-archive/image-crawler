@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pykafka = "*"
 aiohttp = "*"
 Pillow = "*"
 boto3 = "*"
@@ -13,10 +12,10 @@ aioredis = "*"
 aredis = "*"
 redis = "*"
 PyExifTool = "*"
-exifread = "*"
-wand = "*"
+ExifRead = "*"
+Wand = "*"
 multiprocessing-logging = "*"
-pympler = "*"
+Pympler = "*"
 confluent-kafka = "*"
 
 [dev-packages]

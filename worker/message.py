@@ -16,8 +16,8 @@ class AsyncProducer:
     database. This is accomplished by encoding the discovered metadata into
     a Kafka message and publishing it into the corresponding topic.
 
-    pykafka is not asyncio-friendly, so we need to batch our messages together
-    and intermittently send them to Kafka synchronously. Launch
+    The kafka client is not asyncio-friendly, so we need to batch our messages
+    together and intermittently send them to Kafka synchronously. Launch
     `MetadataProducer.listen` as an asyncio task to do this.
     """
     def __init__(self, producer, topic_name, frequency=60):
@@ -26,7 +26,7 @@ class AsyncProducer:
         :param frequency: How often to publish queued events.
         """
         self.frequency = frequency
-        self.producer = producer,
+        self.producer = producer
         self.topic_name = topic_name
         self._messages = []
 
