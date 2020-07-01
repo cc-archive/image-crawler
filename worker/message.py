@@ -49,7 +49,14 @@ class AsyncProducer:
                 log.info(f'Publishing {queue_size} events')
                 start = time.monotonic()
                 for msg in self._messages:
-                    self.producer.produce(self.topic_name, msg)
+                    while True:
+                        try:
+                            self.producer.produce(self.topic_name, msg)
+                        except BufferError:
+                            self.producer.poll(1)
+                            # Yield to other tasks and try again later.
+                            await asyncio.sleep(10)
+                        break
                 rate = queue_size / (time.monotonic() - start)
                 self._messages = []
                 log.info(f'publish_rate={rate}/s')

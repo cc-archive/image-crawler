@@ -6,6 +6,7 @@ import aredis
 import math
 import boto3
 import botocore.client
+import sys
 from functools import partial
 from collections import defaultdict
 from worker.util import save_thumbnail_s3
@@ -223,3 +224,4 @@ if __name__ == '__main__':
     log.basicConfig(level=log.INFO)
     asyncio.run(listen())
     log.info('Shutting down worker.')
+    sys.exit(0)
