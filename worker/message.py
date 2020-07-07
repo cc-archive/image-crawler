@@ -46,16 +46,22 @@ class AsyncProducer:
         while True:
             queue_size = len(self._messages)
             if queue_size:
-                log.info(f'Publishing {queue_size} events')
+                log.info(f'Publishing {queue_size} events to {self.topic_name}')
                 start = time.monotonic()
                 for msg in self._messages:
-                    while True:
+                    produce_attempts = 0
+                    while produce_attempts < 10:
                         try:
                             self.producer.produce(self.topic_name, msg)
                         except BufferError:
+                            produce_attempts += 1
                             self.producer.poll(1)
                             # Yield to other tasks and try again later.
-                            await asyncio.sleep(10)
+                            log.info(
+                                f'AsyncProducer yielding due to overload.'
+                                f' Attempts so far: {produce_attempts}'
+                            )
+                            await asyncio.sleep(5)
                         break
                 rate = queue_size / (time.monotonic() - start)
                 self._messages = []
@@ -63,8 +69,12 @@ class AsyncProducer:
             await asyncio.sleep(self.frequency)
 
 
-def parse_message(message):
-    decoded = json.loads(str(message.value(), 'utf-8'))
+def parse_message(msg):
+    try:
+        decoded = json.loads(str(msg.value(), 'utf-8'))
+    except json.JSONDecodeError:
+        log.error(f'Failed to parse inbound message {msg}: ', exc_info=True)
+        decoded = None
     return decoded
 
 

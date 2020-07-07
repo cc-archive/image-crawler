@@ -47,7 +47,9 @@ class CrawlScheduler:
         while len(msgs) < n and messages_remaining:
             msg = consumer.poll(timeout=0.1)
             if msg:
-                msgs.append(parse_message(msg))
+                parsed = parse_message(msg)
+                if parsed:
+                    msgs.append(parsed)
             else:
                 messages_remaining = False
         return msgs
@@ -221,7 +223,8 @@ async def listen():
 
 
 if __name__ == '__main__':
+    log.basicConfig(level=log.INFO, format='%(asctime)s %(message)s')
     log.basicConfig(level=log.INFO)
-    asyncio.run(listen())
+    asyncio.run(listen(), debug=True)
     log.info('Shutting down worker.')
     sys.exit(0)
