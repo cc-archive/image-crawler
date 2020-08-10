@@ -6,7 +6,7 @@ import crawl_monitor.settings as settings
 from crawl_monitor.rate_limit import rate_limit_regulator
 from crawl_monitor.structured_logging import log_state
 from crawl_monitor.source_splitter import SourceSplitter
-from worker.util import kafka_connect
+from confluent_kafka import Producer, Consumer
 from multiprocessing import Process
 from multiprocessing_logging import install_mp_handler
 
@@ -26,15 +26,14 @@ def run_splitter():
     Takes messages from the inbound_images topic and divides each source
     into its own queue for scheduling.
     """
-    kafka_client = kafka_connect()
-    inbound_images = kafka_client.topics['inbound_images']
-    consumer = inbound_images.get_balanced_consumer(
-        consumer_group='splitter',
-        auto_commit_enable=True,
-        zookeeper_connect=settings.ZOOKEEPER_HOST,
-        use_rdkafka=True
-    )
-    splitter = SourceSplitter(kafka_client, consumer)
+    inbound_images = Consumer({
+        'bootstrap.servers': settings.KAFKA_HOSTS,
+        'group.id': 'splitter',
+        'auto.offset.reset': 'earliest'
+    })
+    producer = Producer({'bootstrap.servers': settings.KAFKA_HOSTS})
+    inbound_images.subscribe(['inbound_images'])
+    splitter = SourceSplitter(producer, inbound_images)
     splitter.split()
 
 

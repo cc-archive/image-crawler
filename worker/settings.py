@@ -1,5 +1,7 @@
 import os
 
+true_strings = ['true', 'True', 't', '1']
+
 # S3
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
@@ -23,3 +25,5 @@ SCHEDULE_SIZE = int(os.getenv('SCHEDULE_SIZE', '3000'))
 # limit. Also be mindful that running too many coroutines simultaneously can
 # be detrimental to performance.
 MAX_TASKS = 3000
+
+PROFILE_MEMORY = os.getenv('PROFILE_MEMORY', 'False') in true_strings

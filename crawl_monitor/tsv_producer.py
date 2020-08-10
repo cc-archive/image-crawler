@@ -4,7 +4,7 @@ import csv
 import argparse
 import logging as log
 from urllib.parse import urlparse
-from pykafka import KafkaClient
+from confluent_kafka import Producer
 
 """
 Schedules URLs for crawling from a TSV file.
@@ -45,20 +45,22 @@ tsv_path = parsed_args.tsv_path[0]
 in_tsv = open(tsv_path, 'r')
 hosts = parsed_args.kafka_hosts[0]
 log.info(f'Connecting to Kafka broker(s): {hosts}')
-client = KafkaClient(hosts=parsed_args.kafka_hosts[0])
-topic = client.topics['inbound_images']
 reader = csv.DictReader(in_tsv, delimiter='\t')
 start = time.monotonic()
 log.info('Beginning production of messages')
-with topic.get_producer(
-        use_rdkafka=True,
-        max_queued_messages=5000000,
-        block_on_queue_full=True
-) as producer:
-    for idx, row in enumerate(reader):
-        encoded = _parse_row(row)
-        producer.produce(encoded)
-        if idx % 10000 == 0:
-            log.info(f'Produced {idx} messages so far')
-print(f'Produced {idx} at rate {idx / (time.monotonic() - start)}/s')
+producer = Producer({'bootstrap.servers': hosts})
+count = 0
+for idx, row in enumerate(reader):
+    count = idx
+    encoded = _parse_row(row)
+    while True:
+        try:
+            producer.produce('inbound_images', encoded)
+        except BufferError:
+            # Give the producer time to catch up before retrying
+            producer.poll(1)
+        break
+    if idx % 10000 == 0:
+        log.info(f'Produced {idx} messages so far')
+print(f'Produced {count} at rate {count / (time.monotonic() - start)}/s')
 in_tsv.close()

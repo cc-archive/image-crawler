@@ -17,7 +17,6 @@ RETRY_CODES = {
     403,
     429,
     500,
-    NO_RATE_TOKEN,
     SERVER_DISCONNECTED
 }
 

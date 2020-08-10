@@ -16,17 +16,18 @@ class AsyncProducer:
     database. This is accomplished by encoding the discovered metadata into
     a Kafka message and publishing it into the corresponding topic.
 
-    pykafka is not asyncio-friendly, so we need to batch our messages together
-    and intermittently send them to Kafka synchronously. Launch
+    The kafka client is not asyncio-friendly, so we need to batch our messages
+    together and intermittently send them to Kafka synchronously. Launch
     `MetadataProducer.listen` as an asyncio task to do this.
     """
-    def __init__(self, producer_topic, frequency=60):
+    def __init__(self, producer, topic_name, frequency=60):
         """
-        :param producer_topic: A pykafka producer.
+        :param producer: A pykafka producer.
         :param frequency: How often to publish queued events.
         """
         self.frequency = frequency
-        self.producer = producer_topic
+        self.producer = producer
+        self.topic_name = topic_name
         self._messages = []
 
     def enqueue_message(self, msg: dict):
@@ -34,7 +35,9 @@ class AsyncProducer:
             _msg_json = json.dumps(msg)
             _msg = bytes(_msg_json, 'utf-8')
         except TypeError:
-            log.warning(f'Failed to encode message: {msg}')
+            ident = msg.get('identifier', '')
+            log.warning(f'Failed to encode message with keys: '
+                        f'{list([msg.keys()])}. Identifier: {ident}')
             return
         self._messages.append(_msg)
 
@@ -43,18 +46,35 @@ class AsyncProducer:
         while True:
             queue_size = len(self._messages)
             if queue_size:
-                log.info(f'Publishing {queue_size} events')
+                log.info(f'Publishing {queue_size} events to {self.topic_name}')
                 start = time.monotonic()
                 for msg in self._messages:
-                    self.producer.produce(msg)
+                    produce_attempts = 0
+                    while produce_attempts < 10:
+                        try:
+                            self.producer.produce(self.topic_name, msg)
+                        except BufferError:
+                            produce_attempts += 1
+                            self.producer.poll(1)
+                            # Yield to other tasks and try again later.
+                            log.info(
+                                f'AsyncProducer yielding due to overload.'
+                                f' Attempts so far: {produce_attempts}'
+                            )
+                            await asyncio.sleep(5)
+                        break
                 rate = queue_size / (time.monotonic() - start)
                 self._messages = []
                 log.info(f'publish_rate={rate}/s')
             await asyncio.sleep(self.frequency)
 
 
-def parse_message(message):
-    decoded = json.loads(str(message.value, 'utf-8'))
+def parse_message(msg):
+    try:
+        decoded = json.loads(str(msg.value(), 'utf-8'))
+    except json.JSONDecodeError:
+        log.error(f'Failed to parse inbound message {msg}: ', exc_info=True)
+        decoded = None
     return decoded
 
 

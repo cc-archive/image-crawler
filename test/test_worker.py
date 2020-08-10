@@ -49,7 +49,7 @@ async def test_handles_corrupt_images_gracefully():
     redis = FakeRedis()
     stats = StatsManager(redis)
     kafka = FakeProducer()
-    producer = AsyncProducer(kafka)
+    producer = AsyncProducer(kafka, 'foo')
     await process_image(
         persister=validate_thumbnail,
         session=RateLimitedClientSession(FakeAioSession(corrupt=True), redis),
@@ -72,7 +72,7 @@ async def test_handled_404s():
     redis = FakeRedis()
     stats = StatsManager(redis)
     kafka = FakeProducer()
-    rot_producer = AsyncProducer(kafka)
+    rot_producer = AsyncProducer(kafka, 'foo')
     session = RateLimitedClientSession(
         FakeAioSession(corrupt=True, status=404), redis
     )
@@ -103,7 +103,7 @@ async def test_records_errors():
     stats = StatsManager(redis)
     session = RateLimitedClientSession(FakeAioSession(status=403), redis)
     retry_producer = FakeProducer()
-    producer = AsyncProducer(retry_producer)
+    producer = AsyncProducer(retry_producer, 'foo')
     await process_image(
         persister=validate_thumbnail,
         session=session,
@@ -144,7 +144,7 @@ async def producer_fixture():
     stats = StatsManager(redis)
     meta_producer = FakeProducer()
     retry_producer = FakeProducer()
-    producer = AsyncProducer(meta_producer)
+    producer = AsyncProducer(meta_producer, 'foo')
     await process_image(
         persister=validate_thumbnail,
         session=RateLimitedClientSession(FakeAioSession(), redis),
