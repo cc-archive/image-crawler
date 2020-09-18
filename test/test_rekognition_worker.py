@@ -4,8 +4,9 @@ import pytest
 import botocore
 import uuid
 from analysis.rekognition_worker import (
-    listen, LocalTokenBucket, RecentlyProcessed, TaskStatus
+    listen, TaskStatus
 )
+from analysis.util import LocalTokenBucket, RecentlyProcessed
 from test.mocks import FakeConsumer, FakeProducer
 
 log.basicConfig(level=log.INFO, format='%(asctime)s %(message)s')
