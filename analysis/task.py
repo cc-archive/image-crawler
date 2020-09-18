@@ -28,8 +28,8 @@ def handle_image_task(message, output_producer, recent_ids):
     return TaskStatus.SUCCEEDED
 
 
-def enqueue(rekognition_response: dict, kafka_producer):
-    resp_json = json.dumps(rekognition_response).encode('utf-8')
+def enqueue(output_event: dict, kafka_producer):
+    resp_json = json.dumps(output_event).encode('utf-8')
     kafka_producer.produce(LABELS_TOPIC, resp_json)
 
 
