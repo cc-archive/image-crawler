@@ -48,7 +48,7 @@ class LocalTokenBucket:
         while not token_acquired:
             token_acquired = self._acquire_token()
             time.sleep(0.01)
-        return task_to_throttle
+        task_to_throttle()
 
 
 def detect_labels_query(image_uuid, boto3_session):
@@ -72,7 +72,7 @@ def enqueue(rekognition_response: dict, kafka_producer):
     kafka_producer.produce(LABELS_TOPIC, resp_json)
 
 
-def task(image_uuid, output_producer):
+def handle_image_task(image_uuid, output_producer):
     """
     Get Rekognition labels for an image and output results to a Kafka topic
     """
@@ -119,7 +119,7 @@ def _schedule_tasks(msg_buffer, executor, futures, task_fn, producer):
                 str(msg.value(), 'utf-8'),
                 producer
             )
-            future = executor.submit(token_bucket.throttle_fn(partial_task))
+            future = executor.submit(token_bucket.throttle_fn, partial_task)
             futures.append(future)
         # Flush msg buffer after scheduling
         msg_buffer = []
