@@ -51,7 +51,7 @@ def test_exception_raised():
             consumer1.insert(fake_event)
             consumer2.insert(fake_event)
         listen(consumer1, producer, mock_work_fn_failure)
-        listen(consumer2, producer, mock_work_fn_failure)
+        listen(consumer2, producer, mock_boto3_fn_failure)
 
 
 def test_token_bucket_contention():

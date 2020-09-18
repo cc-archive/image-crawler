@@ -109,8 +109,8 @@ if __name__ == '__main__':
     output_producer = Producer({'bootstrap.servers': settings.KAFKA_HOSTS})
     inbound_consumer = Consumer({
         'bootstrap.servers': settings.KAFKA_HOSTS,
-        'group.id': 'image_metadata_updates',
+        'group.id': 'rekognition_worker',
         'auto.offset.reset': 'earliest'
     })
-    inbound_consumer.subscribe([])
+    inbound_consumer.subscribe(['image_metadata_updates'])
     listen(inbound_consumer, output_producer, handle_image_task)
