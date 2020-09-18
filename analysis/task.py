@@ -2,6 +2,8 @@ import json
 import boto3
 import enum
 
+LABELS_TOPIC = 'image_analysis_labels'
+
 
 class TaskStatus(enum.Enum):
     SUCCEEDED = 1
@@ -45,6 +47,3 @@ def detect_labels_query(image_uuid, boto3_session):
         'response': response
     }
     return data
-
-
-LABELS_TOPIC = 'image_analysis_labels'
