@@ -6,9 +6,11 @@ import threading
 import json
 import concurrent.futures
 import enum
+import worker.settings as settings
 from functools import partial
 from json.decoder import JSONDecodeError
 from collections import defaultdict, Counter
+from confluent_kafka import Consumer, Producer
 
 IMG_BUCKET = 'cc-image-analysis'
 LABELS_TOPIC = 'image_analysis_labels'
@@ -21,7 +23,6 @@ MAX_PENDING_FUTURES = 1000
 NUM_THREADS = 50
 # Number of recently processed image IDs to retain for duplication prevention
 NUM_RECENT_IMAGE_ID_RETENTION = 10000
-# Deduplication set
 
 
 class TaskStatus(enum.Enum):
@@ -195,14 +196,14 @@ def listen(consumer, producer, task_fn):
         msg_buffer = _schedule_tasks(
             msg_buffer, executor, futures, task_fn, producer
         )
-        _futures, future_stats = _monitor_futures(futures)
-        futures = _futures
+        pending_futures, future_stats = _monitor_futures(futures)
+        futures = pending_futures
         status_tracker += future_stats
         pending = len(futures)
         if not last_log or time.time() - last_log > 1:
             last_log = time.time()
             log.info(
-                f'Stats for {task_fn}: {status_tracker}; {pending} pending'
+                f'{task_fn}: {status_tracker}; {pending} pending'
             )
     log.info(f'Processed {status_tracker} tasks')
     log.info('No more tasks in queue. Waiting for pending tasks...')
@@ -215,3 +216,10 @@ def listen(consumer, producer, task_fn):
 
 if __name__ == '__main__':
     log.basicConfig(level=log.INFO, format='%(asctime)s %(message)s')
+    output_producer = Producer({'bootstrap.servers': settings.KAFKA_HOSTS})
+    consumer = Consumer({
+        'bootstrap.servers': settings.KAFKA_HOSTS,
+        'group.id': 'rekognition_worker',
+        'auto.offset.reset': 'earliest'
+    })
+    listen(consumer, output_producer, handle_image_task)
