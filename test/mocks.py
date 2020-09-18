@@ -9,7 +9,10 @@ from functools import partial
 
 class FakeMessage:
     def __init__(self, value):
-        self.value = value
+        self._value = value
+
+    def value(self):
+        return self._value
 
 
 class FakeConsumer:
@@ -21,9 +24,10 @@ class FakeConsumer:
             FakeMessage(bytes(message, 'utf-8'))
         )
 
-    def consume(self, block=True):
+    def poll(self, timeout=0):
         if self.messages:
-            return self.messages.pop()
+            msg = self.messages.pop()
+            return msg
         else:
             return None
 
