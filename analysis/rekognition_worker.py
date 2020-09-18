@@ -5,6 +5,7 @@ import time
 import threading
 import json
 import concurrent.futures
+from functools import partial
 
 IMG_BUCKET = 'cc-image-analysis'
 LABELS_TOPIC = 'image_analysis_labels'
@@ -13,7 +14,7 @@ MAX_REKOGNITION_RPS = 50
 # Number of pending messages to store simultaneously in memory
 NUM_MESSAGES_BUFFER = 1500
 MAX_PENDING_FUTURES = 1000
-# These are IO bound threads, it's OK to use a lot of them
+# These are network-bound threads, it's OK to use a lot of them
 NUM_THREADS = 50
 
 
@@ -61,11 +62,15 @@ def enqueue(rekognition_response: dict, kafka_producer):
     kafka_producer.produce(LABELS_TOPIC, resp_json)
 
 
-def task(image_uuid, output_producer, token_bucket):
+def _throttler(token_bucket, task_to_throttle):
     token_acquired = False
     while not token_acquired:
         token_acquired = token_bucket.acquire_token()
         time.sleep(0.01)
+    return task_to_throttle
+
+
+def task(image_uuid, output_producer):
     try:
         boto3_session = boto3.session.Session()
         response = detect_labels_query(image_uuid, boto3_session)
@@ -74,7 +79,8 @@ def task(image_uuid, output_producer, token_bucket):
         log.error('Boto3 failure: ', exc_info=True)
 
 
-def monitor_futures(futures):
+def _monitor_futures(futures):
+    """ Summarizes task progress and handles exceptions """
     _futures = []
     finished = 0
     for f in futures:
@@ -89,7 +95,7 @@ def monitor_futures(futures):
 
 
 def listen(consumer, producer, task_fn):
-    processed = 0
+    finished_tasks = 0
     token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
     msg_buffer = []
     futures = []
@@ -108,23 +114,28 @@ def listen(consumer, producer, task_fn):
         # Schedule tasks
         if len(futures) < MAX_PENDING_FUTURES:
             for msg in msg_buffer:
-                future = executor.submit(
-                    task_fn, str(msg.value(), 'utf-8'), producer, token_bucket
+                partial_task = partial(
+                    task_fn,
+                    str(msg.value(), 'utf-8'),
+                    producer
                 )
+                future = executor.submit(_throttler(token_bucket, partial_task))
                 futures.append(future)
+            # Flush msg buffer after scheduling
             msg_buffer = []
-        # Summarize current progress and trim finished tasks
-        _futures, completed = monitor_futures(futures)
+        _futures, completed_futures = _monitor_futures(futures)
         futures = _futures
-        processed += completed
+        finished_tasks += completed_futures
         pending = len(futures)
         if not last_log or time.time() - last_log > 1:
             last_log = time.time()
-            log.info(f'Completed {processed} {task_fn} calls')
-    log.info(f'Processed {processed} tasks; {pending} pending')
+            log.info(
+                f'Completed {finished_tasks} {task_fn} calls; {pending} pending'
+            )
+    log.info(f'Processed {finished_tasks} tasks')
     log.info('No more tasks in queue. Waiting for pending tasks...')
     executor.shutdown(wait=True)
-    monitor_futures(futures)
+    _monitor_futures(futures)
     log.info('Worker shutting down')
 
 

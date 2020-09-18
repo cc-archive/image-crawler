@@ -1,24 +1,17 @@
 import time
 import logging as log
+import pytest
 from analysis.rekognition_worker import listen, LocalTokenBucket
 from test.mocks import FakeConsumer, FakeProducer
 
 log.basicConfig(level=log.INFO, format='%(asctime)s %(message)s')
 
 
-def mock_work_function(_, __, token_bucket):
-    token_acquired = False
-    while not token_acquired:
-        token_acquired = token_bucket.acquire_token()
-        time.sleep(0.01)
+def mock_work_function(*args, **kwargs):
     time.sleep(1)
 
 
-def mock_work_fn_failure(_, __, token_bucket):
-    token_acquired = False
-    while not token_acquired:
-        token_acquired = token_bucket.acquire_token()
-        time.sleep(0.01)
+def mock_work_fn_failure(*args, **kwargs):
     raise ValueError()
 
 
@@ -31,13 +24,15 @@ def test_scheduler_terminates():
     listen(consumer, producer, mock_work_function)
 
 
-def test_exception_handling():
-    consumer = FakeConsumer()
-    producer = FakeProducer()
-    fake_events = ["1"] * 100
-    for fake_event in fake_events:
-        consumer.insert(fake_event)
-    listen(consumer, producer, mock_work_fn_failure)
+def test_exception_raised():
+    """ Make sure exceptions in child threads get caught """
+    with pytest.raises(ValueError):
+        consumer = FakeConsumer()
+        producer = FakeProducer()
+        fake_events = ["1"] * 100
+        for fake_event in fake_events:
+            consumer.insert(fake_event)
+        listen(consumer, producer, mock_work_fn_failure)
 
 
 def test_token_bucket_contention():
