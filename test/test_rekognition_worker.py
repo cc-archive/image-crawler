@@ -4,8 +4,9 @@ import pytest
 import botocore
 import uuid
 from analysis.rekognition_worker import (
-    listen, TaskStatus
+    listen
 )
+from analysis.task import TaskStatus
 from analysis.util import LocalTokenBucket, RecentlyProcessed
 from test.mocks import FakeConsumer, FakeProducer
 

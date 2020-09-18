@@ -2,16 +2,14 @@ import botocore.exceptions
 import logging as log
 import time
 import concurrent.futures
-import enum
 import worker.settings as settings
 from functools import partial
 from collections import defaultdict, Counter
 from confluent_kafka import Consumer, Producer
-from analysis.task import handle_image_task
+from analysis.task import handle_image_task, TaskStatus
 from analysis.util import LocalTokenBucket, RecentlyProcessed, parse_msg
 
 IMG_BUCKET = 'cc-image-analysis'
-LABELS_TOPIC = 'image_analysis_labels'
 # Used to respect AWS service limits
 MAX_REKOGNITION_RPS = 50
 # Number of pending messages to store simultaneously in memory
@@ -21,12 +19,6 @@ MAX_PENDING_FUTURES = 1000
 NUM_THREADS = 50
 # Number of recently processed image IDs to retain for duplication prevention
 NUM_RECENT_IMAGE_ID_RETENTION = 10000
-
-
-class TaskStatus(enum.Enum):
-    SUCCEEDED = 1
-    IGNORED_DUPLICATE = 2
-    ERROR = 3
 
 
 def _monitor_futures(futures):
