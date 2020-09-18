@@ -19,6 +19,9 @@ NUM_THREADS = 50
 
 
 class LocalTokenBucket:
+    """
+    A thread-safe token bucket for ensuring conformance to a rate limit.
+    """
     def __init__(self, max_val, refresh_rate_sec=1):
         self._refresh_rate_sec = refresh_rate_sec
         self._lock = threading.Lock()
@@ -26,7 +29,7 @@ class LocalTokenBucket:
         self._MAX_TOKENS = max_val
         self._curr_tokens = max_val
 
-    def acquire_token(self):
+    def _acquire_token(self):
         with self._lock:
             now = time.time()
             if not self._last_timestamp:
@@ -39,6 +42,13 @@ class LocalTokenBucket:
                 return False
             self._curr_tokens -= 1
             return True
+
+    def throttle_fn(self, task_to_throttle):
+        token_acquired = False
+        while not token_acquired:
+            token_acquired = self._acquire_token()
+            time.sleep(0.01)
+        return task_to_throttle
 
 
 def detect_labels_query(image_uuid, boto3_session):
@@ -62,15 +72,10 @@ def enqueue(rekognition_response: dict, kafka_producer):
     kafka_producer.produce(LABELS_TOPIC, resp_json)
 
 
-def _throttler(token_bucket, task_to_throttle):
-    token_acquired = False
-    while not token_acquired:
-        token_acquired = token_bucket.acquire_token()
-        time.sleep(0.01)
-    return task_to_throttle
-
-
 def task(image_uuid, output_producer):
+    """
+    Get Rekognition labels for an image and output results to a Kafka topic
+    """
     try:
         boto3_session = boto3.session.Session()
         response = detect_labels_query(image_uuid, boto3_session)
@@ -114,7 +119,7 @@ def _schedule_tasks(msg_buffer, executor, futures, task_fn, producer):
                 str(msg.value(), 'utf-8'),
                 producer
             )
-            future = executor.submit(_throttler(token_bucket, partial_task))
+            future = executor.submit(token_bucket.throttle_fn(partial_task))
             futures.append(future)
         # Flush msg buffer after scheduling
         msg_buffer = []
