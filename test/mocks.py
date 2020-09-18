@@ -160,7 +160,7 @@ class FakeRedis:
     async def sadd(self, key, value):
         if key not in self.store:
             self.store[key] = set()
-        self.store[key].add(bytes(value, 'utf8-'))
+        self.store[key].seen_recently(bytes(value, 'utf8-'))
 
     async def srem(self, key, value):
         try:
