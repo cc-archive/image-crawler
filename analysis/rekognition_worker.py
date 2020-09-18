@@ -94,35 +94,45 @@ def _monitor_futures(futures):
     return _futures, finished
 
 
+def _poll_work(msg_buffer, msgs_remaining, consumer):
+    while len(msg_buffer) < NUM_MESSAGES_BUFFER and msgs_remaining:
+        msg = consumer.poll(timeout=10)
+        if not msg:
+            log.info('No more messages remaining')
+            msgs_remaining = False
+        else:
+            msg_buffer.append(msg)
+    return msgs_remaining
+
+
+def _schedule_tasks(msg_buffer, executor, futures, task_fn, producer):
+    token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
+    if len(futures) < MAX_PENDING_FUTURES:
+        for msg in msg_buffer:
+            partial_task = partial(
+                task_fn,
+                str(msg.value(), 'utf-8'),
+                producer
+            )
+            future = executor.submit(_throttler(token_bucket, partial_task))
+            futures.append(future)
+        # Flush msg buffer after scheduling
+        msg_buffer = []
+    return msg_buffer
+
+
 def listen(consumer, producer, task_fn):
     finished_tasks = 0
-    token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
     msg_buffer = []
     futures = []
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS)
     msgs_remaining = True
     last_log = None
     while msgs_remaining:
-        # Get work from the queue
-        while len(msg_buffer) < NUM_MESSAGES_BUFFER and msgs_remaining:
-            msg = consumer.poll(timeout=10)
-            if not msg:
-                log.info('No more messages remaining')
-                msgs_remaining = False
-            else:
-                msg_buffer.append(msg)
-        # Schedule tasks
-        if len(futures) < MAX_PENDING_FUTURES:
-            for msg in msg_buffer:
-                partial_task = partial(
-                    task_fn,
-                    str(msg.value(), 'utf-8'),
-                    producer
-                )
-                future = executor.submit(_throttler(token_bucket, partial_task))
-                futures.append(future)
-            # Flush msg buffer after scheduling
-            msg_buffer = []
+        msgs_remaining = _poll_work(msg_buffer, msgs_remaining, consumer)
+        msg_buffer = _schedule_tasks(
+            msg_buffer, executor, futures, task_fn, producer
+        )
         _futures, completed_futures = _monitor_futures(futures)
         futures = _futures
         finished_tasks += completed_futures

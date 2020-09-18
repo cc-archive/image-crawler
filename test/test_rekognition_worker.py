@@ -54,6 +54,3 @@ def test_token_bucket_refresh():
     assert token_acquired
     assert token_acquired_2
 
-
-if __name__ == '__main__':
-    test_exception_handling()
