@@ -1,6 +1,7 @@
 import time
 import logging as log
 import pytest
+import botocore
 from analysis.rekognition_worker import listen, LocalTokenBucket
 from test.mocks import FakeConsumer, FakeProducer
 
@@ -15,6 +16,10 @@ def mock_work_fn_failure(*args, **kwargs):
     raise ValueError()
 
 
+def mock_boto3_fn_failure(*args, **kwargs):
+    raise botocore.exceptions.ClientError('test')
+
+
 def test_scheduler_terminates():
     consumer = FakeConsumer()
     producer = FakeProducer()
@@ -27,12 +32,15 @@ def test_scheduler_terminates():
 def test_exception_raised():
     """ Make sure exceptions in child threads get caught """
     with pytest.raises(ValueError):
-        consumer = FakeConsumer()
+        consumer1 = FakeConsumer()
+        consumer2 = FakeConsumer()
         producer = FakeProducer()
         fake_events = ["1"] * 100
         for fake_event in fake_events:
-            consumer.insert(fake_event)
-        listen(consumer, producer, mock_work_fn_failure)
+            consumer1.insert(fake_event)
+            consumer2.insert(fake_event)
+        listen(consumer1, producer, mock_work_fn_failure)
+        listen(consumer2, producer, mock_work_fn_failure)
 
 
 def test_token_bucket_contention():

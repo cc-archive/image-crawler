@@ -72,16 +72,15 @@ def enqueue(rekognition_response: dict, kafka_producer):
     kafka_producer.produce(LABELS_TOPIC, resp_json)
 
 
-def handle_image_task(image_uuid, output_producer):
+def handle_image_task(message, output_producer):
     """
     Get Rekognition labels for an image and output results to a Kafka topic
     """
-    try:
-        boto3_session = boto3.session.Session()
-        response = detect_labels_query(image_uuid, boto3_session)
-        enqueue(response, output_producer)
-    except botocore.exceptions:
-        log.error('Boto3 failure: ', exc_info=True)
+    msg = json.loads(message)
+    image_uuid = msg['identifier']
+    boto3_session = boto3.session.Session()
+    response = detect_labels_query(image_uuid, boto3_session)
+    enqueue(response, output_producer)
 
 
 def _monitor_futures(futures):
@@ -91,8 +90,10 @@ def _monitor_futures(futures):
     for f in futures:
         if f.done():
             finished += 1
-            if f.exception():
-                raise f.exception()
+        try:
+            f.result()
+        except botocore.exceptions.ClientError:
+            log.warning("Boto3 failure: ", exc_info=True)
         else:
             # Keep pending futures
             _futures.append(f)
@@ -114,11 +115,7 @@ def _schedule_tasks(msg_buffer, executor, futures, task_fn, producer):
     token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
     if len(futures) < MAX_PENDING_FUTURES:
         for msg in msg_buffer:
-            partial_task = partial(
-                task_fn,
-                str(msg.value(), 'utf-8'),
-                producer
-            )
+            partial_task = partial(task_fn, str(msg.value(), 'utf-8'), producer)
             future = executor.submit(token_bucket.throttle_fn, partial_task)
             futures.append(future)
         # Flush msg buffer after scheduling
