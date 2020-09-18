@@ -9,6 +9,11 @@ from confluent_kafka import Consumer, Producer
 from analysis.task import handle_image_task, TaskStatus
 from analysis.util import LocalTokenBucket, RecentlyProcessed, parse_msg
 
+"""
+Feeds crawled images stored in S3 to AWS Rekognition and stores the resulting
+metadata in a new Kafka topic.
+"""
+
 IMG_BUCKET = 'cc-image-analysis'
 # Used to respect AWS service limits
 MAX_REKOGNITION_RPS = 50
