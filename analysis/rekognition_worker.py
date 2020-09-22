@@ -70,6 +70,11 @@ def _schedule_tasks(
         msg_buffer, executor, futures, task_fn, producer, recent_ids,
         token_bucket
 ):
+    """
+    Schedule up to MAX_PENDING_FUTURES tasks for execution. Returns a list of
+    messages indicating which messages have not been processed due to the
+    max pending futures limit.
+    """
     if len(futures) < MAX_PENDING_FUTURES:
         for msg in msg_buffer:
             partial_task = partial(task_fn, msg, producer, recent_ids)
