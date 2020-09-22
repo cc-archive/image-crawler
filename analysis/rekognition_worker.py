@@ -48,8 +48,13 @@ def _monitor_futures(futures):
 
 
 def _poll_work(msg_buffer, msgs_remaining, consumer):
-    """ Poll consumer for messages and parse them. """
-    while len(msg_buffer) < NUM_MESSAGES_BUFFER and msgs_remaining:
+    """
+    Poll consumer for messages and parse them.
+    :returns: A tuple of a boolean signaling whether there are more messages
+    to process and a list of messages polled from the queue.
+    """
+    msgs = list(msg_buffer)
+    while len(msgs) < NUM_MESSAGES_BUFFER and msgs_remaining:
         msg = consumer.poll(timeout=10)
         if not msg:
             log.info('No more messages remaining')
@@ -57,21 +62,24 @@ def _poll_work(msg_buffer, msgs_remaining, consumer):
         else:
             parsed = parse_msg(msg)
             if parsed:
-                msg_buffer.append(parsed)
-    return msgs_remaining
+                msgs.append(parsed)
+    return msgs_remaining, msgs
 
 
-def _schedule_tasks(msg_buffer, executor, futures, task_fn, producer):
-    token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
-    recent_ids = RecentlyProcessed(NUM_RECENT_IMAGE_ID_RETENTION)
+def _schedule_tasks(
+        msg_buffer, executor, futures, task_fn, producer, recent_ids,
+        token_bucket
+):
     if len(futures) < MAX_PENDING_FUTURES:
         for msg in msg_buffer:
             partial_task = partial(task_fn, msg, producer, recent_ids)
             future = executor.submit(token_bucket.throttle_fn, partial_task)
             futures.append(future)
-        # Flush msg buffer after scheduling
-        msg_buffer = []
-    return msg_buffer
+        # Flush message buffer after scheduling
+        return []
+    else:
+        # Try to schedule them again later when some futures have completed
+        return msg_buffer
 
 
 def listen(consumer, producer, task_fn):
@@ -81,10 +89,15 @@ def listen(consumer, producer, task_fn):
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS)
     msgs_remaining = True
     last_log = None
+    token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
+    recent_ids = RecentlyProcessed(NUM_RECENT_IMAGE_ID_RETENTION)
     while msgs_remaining:
-        msgs_remaining = _poll_work(msg_buffer, msgs_remaining, consumer)
+        msgs_remaining, msg_buffer = _poll_work(
+            msg_buffer, msgs_remaining, consumer
+        )
         msg_buffer = _schedule_tasks(
-            msg_buffer, executor, futures, task_fn, producer
+            msg_buffer, executor, futures, task_fn, producer, recent_ids,
+            token_bucket
         )
         pending_futures, future_stats = _monitor_futures(futures)
         futures = pending_futures
