@@ -11,7 +11,6 @@ services:
     image: wurstmeister/zookeeper
     ports:
       - "2181:2181"
-    restart: always
   kafka:
     image: wurstmeister/kafka:2.12-2.2.1
     ports:
@@ -24,7 +23,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - zookeeper
-    restart: always
   worker:
     build: 
       context: .

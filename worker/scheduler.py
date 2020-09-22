@@ -224,7 +224,6 @@ async def listen():
 
 if __name__ == '__main__':
     log.basicConfig(level=log.INFO, format='%(asctime)s %(message)s')
-    log.basicConfig(level=log.INFO)
     asyncio.run(listen(), debug=True)
     log.info('Shutting down worker.')
     sys.exit(0)
