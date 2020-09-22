@@ -20,6 +20,10 @@ def make_mock_msg():
 
 def mock_work_function(*args, **kwargs):
     time.sleep(1)
+    recent_ids = args[2]
+    if recent_ids:
+        if recent_ids.seen_recently(args[0]):
+            return TaskStatus.IGNORED_DUPLICATE
     return TaskStatus.SUCCEEDED
 
 
@@ -38,6 +42,20 @@ def test_scheduler_terminates():
     for fake_event in fake_events:
         consumer.insert(fake_event)
     listen(consumer, producer, mock_work_function)
+
+
+def test_end_to_end():
+    consumer = FakeConsumer()
+    producer = FakeProducer()
+    fake_events = [make_mock_msg() for _ in range(90)]
+    dupe_uuid = uuid.uuid4()
+    dupes = [f'{{"identifier":"{dupe_uuid}"}}' for _ in range(10)]
+    fake_events.extend(dupes)
+    for fake_event in fake_events:
+        consumer.insert(fake_event)
+    results = listen(consumer, producer, mock_work_function)
+    assert results[TaskStatus.SUCCEEDED] == 91
+    assert results[TaskStatus.IGNORED_DUPLICATE] == 9
 
 
 def test_exception_raised():

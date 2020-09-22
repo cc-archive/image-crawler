@@ -120,6 +120,7 @@ def listen(consumer, producer, task_fn):
     status_tracker += future_stats
     log.info(f'Aggregate stats: {status_tracker}')
     log.info('Worker shutting down')
+    return status_tracker
 
 
 if __name__ == '__main__':
