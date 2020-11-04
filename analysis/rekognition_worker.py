@@ -32,6 +32,7 @@ def enqueue(output_event: dict, kafka_producer):
     resp_json = json.dumps(output_event).encode('utf-8')
     kafka_producer.produce(LABELS_TOPIC, resp_json)
 
+
 def _monitor_futures(futures, output_producer):
     """
     Summarizes task progress and handles exceptions. Returns a list of pending
