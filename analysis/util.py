@@ -1,6 +1,6 @@
 import json
 import logging as log
-import threading
+import multiprocessing
 import time
 from json import JSONDecodeError
 """
@@ -14,7 +14,7 @@ class LocalTokenBucket:
     """
     def __init__(self, max_val, refresh_rate_sec=1):
         self._refresh_rate_sec = refresh_rate_sec
-        self._lock = threading.Lock()
+        self._lock = multiprocessing.Manager().Lock()
         self._last_timestamp = None
         self._MAX_TOKENS = max_val
         self._curr_tokens = max_val
@@ -53,7 +53,7 @@ class RecentlyProcessed:
         # For remembering order of arrival
         self._queue = []
         self._max_retain = retention_num
-        self._lock = threading.Lock()
+        self._lock = multiprocessing.Manager().Lock()
 
     def seen_recently(self, item):
         with self._lock:

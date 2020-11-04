@@ -11,26 +11,19 @@ class TaskStatus(enum.Enum):
     ERROR = 3
 
 
-def handle_image_task(message, output_producer, recent_ids):
+def handle_image_task(message, recent_ids):
     """
     Get Rekognition labels for an image and output results to a Kafka topic.
 
     Only call Rekognition if we haven't recently processed the ID.
     """
-    msg = json.loads(message)
-    image_uuid = msg['identifier']
+    image_uuid = message
     if recent_ids.seen_recently(image_uuid):
         # We don't want to send the same image to Rekognition multiple times.
         return TaskStatus.IGNORED_DUPLICATE
     boto3_session = boto3.session.Session()
     response = detect_labels_query(image_uuid, boto3_session)
-    enqueue(response, output_producer)
-    return TaskStatus.SUCCEEDED
-
-
-def enqueue(output_event: dict, kafka_producer):
-    resp_json = json.dumps(output_event).encode('utf-8')
-    kafka_producer.produce(LABELS_TOPIC, resp_json)
+    return TaskStatus.SUCCEEDED, response
 
 
 def detect_labels_query(image_uuid, boto3_session):

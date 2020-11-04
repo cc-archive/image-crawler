@@ -1,5 +1,6 @@
 import botocore.exceptions
 import logging as log
+import json
 import time
 import concurrent.futures
 import worker.settings as settings
@@ -23,10 +24,15 @@ MAX_PENDING_FUTURES = 1000
 # These are network-bound threads, it's OK to use a lot of them
 NUM_THREADS = 50
 # Number of recently processed image IDs to retain for duplication prevention
-NUM_RECENT_IMAGE_ID_RETENTION = 10000
+NUM_RECENT_IMAGE_ID_RETENTION = 100000000
+LABELS_TOPIC = 'image_analysis_labels'
 
 
-def _monitor_futures(futures):
+def enqueue(output_event: dict, kafka_producer):
+    resp_json = json.dumps(output_event).encode('utf-8')
+    kafka_producer.produce(LABELS_TOPIC, resp_json)
+
+def _monitor_futures(futures, output_producer):
     """
     Summarizes task progress and handles exceptions. Returns a list of pending
     futures (with completed futures removed).
@@ -37,6 +43,10 @@ def _monitor_futures(futures):
         if f.done():
             try:
                 res = f.result()
+                if type(res) == tuple:
+                    status, event = res
+                    res = status
+                    enqueue(event, output_producer)
                 statuses[res] += 1
             except botocore.exceptions.ClientError:
                 log.warning("Boto3 failure: ", exc_info=True)
@@ -67,7 +77,7 @@ def _poll_work(msg_buffer, msgs_remaining, consumer):
 
 
 def _schedule_tasks(
-        msg_buffer, executor, futures, task_fn, producer, recent_ids,
+        msg_buffer, executor, futures, task_fn, recent_ids,
         token_bucket
 ):
     """
@@ -77,7 +87,7 @@ def _schedule_tasks(
     """
     if len(futures) < MAX_PENDING_FUTURES:
         for msg in msg_buffer:
-            partial_task = partial(task_fn, msg, producer, recent_ids)
+            partial_task = partial(task_fn, msg, recent_ids)
             future = executor.submit(token_bucket.throttle_fn, partial_task)
             futures.append(future)
         # Flush message buffer after scheduling
@@ -91,7 +101,7 @@ def listen(consumer, producer, task_fn):
     status_tracker = Counter({})
     msg_buffer = []
     futures = []
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS)
+    executor = concurrent.futures.ProcessPoolExecutor(max_workers=NUM_THREADS)
     msgs_remaining = True
     last_log = None
     token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
@@ -101,10 +111,10 @@ def listen(consumer, producer, task_fn):
             msg_buffer, msgs_remaining, consumer
         )
         msg_buffer = _schedule_tasks(
-            msg_buffer, executor, futures, task_fn, producer, recent_ids,
+            msg_buffer, executor, futures, task_fn, recent_ids,
             token_bucket
         )
-        pending_futures, future_stats = _monitor_futures(futures)
+        pending_futures, future_stats = _monitor_futures(futures, producer)
         futures = pending_futures
         status_tracker += future_stats
         pending = len(futures)
@@ -116,7 +126,7 @@ def listen(consumer, producer, task_fn):
     log.info(f'Processed {status_tracker} tasks')
     log.info('No more tasks in queue. Waiting for pending tasks...')
     executor.shutdown(wait=True)
-    _, future_stats = _monitor_futures(futures)
+    _, future_stats = _monitor_futures(futures, producer)
     status_tracker += future_stats
     log.info(f'Aggregate stats: {status_tracker}')
     log.info('Worker shutting down')
