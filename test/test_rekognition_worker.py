@@ -20,11 +20,11 @@ def make_mock_msg():
 
 def mock_work_function(*args, **kwargs):
     time.sleep(1)
-    recent_ids = args[2]
+    recent_ids = args[1]
     if recent_ids:
         if recent_ids.seen_recently(args[0]):
             return TaskStatus.IGNORED_DUPLICATE
-    return TaskStatus.SUCCEEDED
+    return TaskStatus.SUCCEEDED, 'mock event output'
 
 
 def mock_work_fn_failure(*args, **kwargs):
