@@ -21,8 +21,10 @@ MAX_REKOGNITION_RPS = 50
 # Number of pending messages to store simultaneously in memory
 NUM_MESSAGES_BUFFER = 1500
 MAX_PENDING_FUTURES = 1000
-# These are network-bound threads, it's OK to use a lot of them
-NUM_THREADS = 50
+# The maximum concurrency for processing requests. This should be tailored to
+# the underlying hardware; experimentation suggests 3 * NUM_CPUS maximizes
+# throughput in this use case.
+NUM_PROCS = 100
 # Number of recently processed image IDs to retain for duplication prevention
 NUM_RECENT_IMAGE_ID_RETENTION = 100
 LABELS_TOPIC = 'image_analysis_labels'
@@ -102,7 +104,7 @@ def listen(consumer, producer, task_fn):
     status_tracker = Counter({})
     msg_buffer = []
     futures = []
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=NUM_THREADS)
+    executor = concurrent.futures.ProcessPoolExecutor(max_workers=NUM_PROCS)
     msgs_remaining = True
     last_log = None
     token_bucket = LocalTokenBucket(MAX_REKOGNITION_RPS)
