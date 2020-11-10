@@ -1,8 +1,5 @@
-import json
 import boto3
 import enum
-
-LABELS_TOPIC = 'image_analysis_labels'
 
 
 class TaskStatus(enum.Enum):

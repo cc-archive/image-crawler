@@ -24,7 +24,7 @@ MAX_PENDING_FUTURES = 1000
 # These are network-bound threads, it's OK to use a lot of them
 NUM_THREADS = 50
 # Number of recently processed image IDs to retain for duplication prevention
-NUM_RECENT_IMAGE_ID_RETENTION = 100000000
+NUM_RECENT_IMAGE_ID_RETENTION = 100
 LABELS_TOPIC = 'image_analysis_labels'
 
 

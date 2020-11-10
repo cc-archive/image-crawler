@@ -11,13 +11,14 @@ Data structures for throttling our requests to AWS and preventing duplicate work
 class LocalTokenBucket:
     """
     A thread-safe token bucket for ensuring conformance to a rate limit.
+    (Multiproc-safe)
     """
     def __init__(self, max_val, refresh_rate_sec=1):
         self._refresh_rate_sec = refresh_rate_sec
         self._lock = multiprocessing.Manager().Lock()
         self._last_timestamp = None
         self._MAX_TOKENS = max_val
-        self._curr_tokens = max_val
+        self._curr_tokens = multiprocessing.Manager().Value('i', max_val)
 
     def _acquire_token(self):
         with self._lock:
@@ -26,11 +27,14 @@ class LocalTokenBucket:
                 self._last_timestamp = now
             elif now - self._last_timestamp > self._refresh_rate_sec:
                 # Replenish
-                self._curr_tokens = self._MAX_TOKENS
+                self._curr_tokens = multiprocessing \
+                    .Manager() \
+                    .Value('i', self._MAX_TOKENS)
                 self._last_timestamp = now
-            if self._curr_tokens <= 0:
+            print(f'tokens: {self._curr_tokens.value} {self._last_timestamp}')
+            if self._curr_tokens.value <= 0:
                 return False
-            self._curr_tokens -= 1
+            self._curr_tokens.value -= 1
             return True
 
     def throttle_fn(self, task_to_throttle):
@@ -41,29 +45,25 @@ class LocalTokenBucket:
         token_acquired = False
         while not token_acquired:
             token_acquired = self._acquire_token()
-            time.sleep(0.01)
+            time.sleep(0.1)
         return task_to_throttle()
 
 
 class RecentlyProcessed:
-    """ Determine whether an item has been seen recently. (Thread-safe) """
+    """ Determine whether an item has been seen recently. (Multiproc-safe) """
     def __init__(self, retention_num):
-        # For fast membership checks
-        self._set = set()
-        # For remembering order of arrival
-        self._queue = []
+        #
+        self._queue = multiprocessing.Manager().list()
         self._max_retain = retention_num
         self._lock = multiprocessing.Manager().Lock()
 
     def seen_recently(self, item):
         with self._lock:
-            if item in self._set:
+            if item in self._queue:
                 return True
-            self._set.add(item)
             self._queue.append(item)
             if len(self._queue) > self._max_retain:
-                to_delete = self._queue.pop(0)
-                self._set.remove(to_delete)
+                self._queue.pop(0)
             return False
 
 
