@@ -31,7 +31,6 @@ class LocalTokenBucket:
                     .Manager() \
                     .Value('i', self._MAX_TOKENS)
                 self._last_timestamp = now
-            print(f'tokens: {self._curr_tokens.value} {self._last_timestamp}')
             if self._curr_tokens.value <= 0:
                 return False
             self._curr_tokens.value -= 1
