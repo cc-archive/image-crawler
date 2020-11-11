@@ -51,7 +51,6 @@ class LocalTokenBucket:
 class RecentlyProcessed:
     """ Determine whether an item has been seen recently. (Multiproc-safe) """
     def __init__(self, retention_num):
-        #
         self._queue = multiprocessing.Manager().list()
         self._max_retain = retention_num
         self._lock = multiprocessing.Manager().Lock()
