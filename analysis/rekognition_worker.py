@@ -33,6 +33,7 @@ LABELS_TOPIC = 'image_analysis_labels'
 def enqueue(output_event: dict, kafka_producer):
     resp_json = json.dumps(output_event).encode('utf-8')
     kafka_producer.produce(LABELS_TOPIC, resp_json)
+    kafka_producer.poll(0)
 
 
 def _monitor_futures(futures, output_producer):
