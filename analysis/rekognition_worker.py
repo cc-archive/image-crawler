@@ -27,7 +27,7 @@ MAX_PENDING_FUTURES = 1000
 NUM_PROCS = 100
 # Number of recently processed image IDs to retain for duplication prevention
 NUM_RECENT_IMAGE_ID_RETENTION = 100
-LABELS_TOPIC = 'image_analysis_labels'
+LABELS_TOPIC = 'image_moderation_labels'
 
 
 def enqueue(output_event: dict, kafka_producer):
@@ -52,7 +52,10 @@ def _monitor_futures(futures, output_producer):
                     res = status
                     enqueue(event, output_producer)
                 statuses[res] += 1
-            except (botocore.exceptions.ClientError, botocore.exceptions.NoCredentialsError):
+            except (
+                    botocore.exceptions.ClientError,
+                    botocore.exceptions.NoCredentialsError
+            ):
                 log.warning("Boto3 failure: ", exc_info=True)
                 statuses[TaskStatus.ERROR] += 1
         else:
@@ -70,7 +73,7 @@ def _poll_work(msg_buffer, msgs_remaining, consumer):
     msgs = list(msg_buffer)
     while len(msgs) < NUM_MESSAGES_BUFFER and msgs_remaining:
         log.debug("Polling Kafka for messages")
-        msg = consumer.poll(timeout=20)
+        msg = consumer.poll(timeout=30)
         if not msg:
             log.info('No more messages remaining')
             msgs_remaining = False
@@ -144,7 +147,7 @@ if __name__ == '__main__':
     output_producer = Producer({'bootstrap.servers': settings.KAFKA_HOSTS})
     inbound_consumer = Consumer({
         'bootstrap.servers': settings.KAFKA_HOSTS,
-        'group.id': 'rekognition_worker',
+        'group.id': 'rekognition_moderation_worker',
         'auto.offset.reset': 'earliest'
     })
     inbound_consumer.subscribe(['image_metadata_updates'])

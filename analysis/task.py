@@ -31,7 +31,7 @@ def detect_labels_query(image_uuid, boto3_session):
         }
     }
     rekog_client = boto3_session.client('rekognition')
-    response = rekog_client.detect_labels(Image=img)
+    response = rekog_client.detect_moderation_labels(Image=img)
     data = {
         'image_uuid': image_uuid,
         'response': response
